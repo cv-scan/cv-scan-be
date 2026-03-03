@@ -1,0 +1,268 @@
+// prisma/schema.prisma
+// Source of truth cho toàn bộ database schema
+// Sau khi sửa file này: npm run db:migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ───────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(RECRUITER)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens   RefreshToken[]
+  jobDescriptions JobDescription[]
+  cvs             CV[]
+  batches         Batch[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  RECRUITER
+  VIEWER
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── Job Descriptions ────────────────────────────────────────
+
+model JobDescription {
+  id              String  @id @default(cuid())
+  title           String
+  content         String
+  department      String?
+  location        String?
+  employmentType  String? @map("employment_type")
+  experienceLevel String? @map("experience_level")
+
+  // Extracted by NLP on JD creation
+  requiredSkills          String[] @map("required_skills")
+  preferredSkills         String[] @map("preferred_skills")
+  requiredExperienceYears Int?     @map("required_experience_years")
+  requiredEducation       String?  @map("required_education")
+
+  // Scoring weights (must sum to 1.0)
+  weightSkills       Float @default(0.35) @map("weight_skills")
+  weightExperience   Float @default(0.30) @map("weight_experience")
+  weightEducation    Float @default(0.15) @map("weight_education")
+  weightAchievements Float @default(0.10) @map("weight_achievements")
+  weightRelevance    Float @default(0.10) @map("weight_relevance")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdBy String   @map("created_by")
+  creator   User     @relation(fields: [createdBy], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  evaluations Evaluation[]
+  batches     Batch[]
+
+  @@index([createdBy])
+  @@map("job_descriptions")
+}
+
+// ─── CVs ─────────────────────────────────────────────────────
+
+model CV {
+  id             String      @id @default(cuid())
+  candidateName  String      @map("candidate_name")
+  candidateEmail String?     @map("candidate_email")
+  fileName       String      @map("file_name")
+  fileType       String      @map("file_type")
+  fileSize       Int         @map("file_size")
+  storagePath    String      @map("storage_path")
+  storageProvider String     @default("local") @map("storage_provider")
+  extractedText  String      @map("extracted_text")
+  extractedAt    DateTime?   @map("extracted_at")
+  parseStatus    ParseStatus @default(PENDING) @map("parse_status")
+  parseError     String?     @map("parse_error")
+
+  uploadedBy String   @map("uploaded_by")
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  evaluations Evaluation[]
+  batchItems  BatchItem[]
+
+  @@index([uploadedBy])
+  @@index([candidateEmail])
+  @@map("cvs")
+}
+
+enum ParseStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ─── Evaluations ─────────────────────────────────────────────
+
+model Evaluation {
+  id               String           @id @default(cuid())
+  cvId             String           @map("cv_id")
+  cv               CV               @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  jobDescriptionId String           @map("job_description_id")
+  jobDescription   JobDescription   @relation(fields: [jobDescriptionId], references: [id])
+  status           EvaluationStatus @default(PENDING)
+  overallScore     Float?           @map("overall_score")
+  recommendation   String?          // STRONG_YES | YES | MAYBE | NO | STRONG_NO
+
+  // NLP engine metadata
+  scoringEngine    String  @default("rule-based-nlp") @map("scoring_engine")
+  processingTimeMs Int?    @map("processing_time_ms")
+
+  errorMessage String? @map("error_message")
+  retryCount   Int     @default(0) @map("retry_count")
+  triggeredBy  String? @map("triggered_by")
+  batchItemId  String? @map("batch_item_id")
+  batchItem    BatchItem? @relation(fields: [batchItemId], references: [id])
+
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  scores    Score[]
+  auditLogs AuditLog[]
+
+  @@unique([cvId, jobDescriptionId])
+  @@index([cvId])
+  @@index([jobDescriptionId])
+  @@index([status])
+  @@map("evaluations")
+}
+
+enum EvaluationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ─── Scores ──────────────────────────────────────────────────
+
+model Score {
+  id           String        @id @default(cuid())
+  evaluationId String        @map("evaluation_id")
+  evaluation   Evaluation    @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  category     ScoreCategory
+  rawScore     Float         @map("raw_score")
+  weight       Float
+  weightedScore Float        @map("weighted_score")
+  rationale    String
+  evidence     String[]
+  gaps         String[]
+
+  @@index([evaluationId])
+  @@map("scores")
+}
+
+enum ScoreCategory {
+  SKILLS
+  EXPERIENCE
+  EDUCATION
+  ACHIEVEMENTS
+  RELEVANCE
+}
+
+// ─── Batch Processing ─────────────────────────────────────────
+
+model Batch {
+  id               String      @id @default(cuid())
+  name             String?
+  jobDescriptionId String      @map("job_description_id")
+  jobDescription   JobDescription @relation(fields: [jobDescriptionId], references: [id])
+  status           BatchStatus @default(PENDING)
+  totalCount       Int         @default(0) @map("total_count")
+  completedCount   Int         @default(0) @map("completed_count")
+  failedCount      Int         @default(0) @map("failed_count")
+  queueJobId       String?     @map("queue_job_id")
+
+  createdBy   String    @map("created_by")
+  creator     User      @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  items BatchItem[]
+
+  @@index([createdBy])
+  @@index([jobDescriptionId])
+  @@map("batches")
+}
+
+enum BatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  PARTIALLY_FAILED
+  FAILED
+  CANCELLED
+}
+
+model BatchItem {
+  id         String           @id @default(cuid())
+  batchId    String           @map("batch_id")
+  batch      Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  cvId       String           @map("cv_id")
+  cv         CV               @relation(fields: [cvId], references: [id])
+  status     EvaluationStatus @default(PENDING)
+  queueJobId String?          @map("queue_job_id")
+
+  evaluations Evaluation[]
+
+  @@unique([batchId, cvId])
+  @@index([batchId])
+  @@map("batch_items")
+}
+
+// ─── Audit Log ────────────────────────────────────────────────
+
+model AuditLog {
+  id           String     @id @default(cuid())
+  evaluationId String?    @map("evaluation_id")
+  evaluation   Evaluation? @relation(fields: [evaluationId], references: [id])
+  entityType   String     @map("entity_type")
+  entityId     String     @map("entity_id")
+  action       String
+  actorId      String?    @map("actor_id")
+  actorType    String     @default("user") @map("actor_type")
+  previousState Json?     @map("previous_state")
+  newState      Json?     @map("new_state")
+  metadata      Json?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
