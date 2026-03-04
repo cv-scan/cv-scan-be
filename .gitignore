@@ -5,4 +5,3 @@ uploads/
 *.log
 .DS_Store
 coverage/
-.claude/
