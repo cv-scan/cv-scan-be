@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: cv-scan-be
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npx prisma migrate deploy && node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_TLS
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: BULL_BOARD_USERNAME
+        value: admin
+      - key: BULL_BOARD_PASSWORD
+        sync: false
