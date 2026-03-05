@@ -1,3 +1,7 @@
+---
+name: code-review
+description: Code review guidelines for our services
+---
 # Skill: Code Review
 
 ## Mục đích

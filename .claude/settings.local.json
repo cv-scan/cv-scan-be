@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(npm install:*)",
+      "Bash(RAILWAY_API_TOKEN=bab92335-845a-410c-9dc5-e0a3eeddabef railway up:*)"
     ]
   }
 }
