@@ -4,12 +4,12 @@ WORKDIR /app
 # Dependencies layer
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Build layer
 FROM base AS builder
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npm run build
 
