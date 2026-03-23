@@ -1,5 +1,5 @@
-import { env } from './config/env';
 import { buildApp } from './config/app.config';
+import { env } from './config/env';
 import { setBatchQueueFactory } from './modules/batches/batches.service';
 import { getBatchQueue } from './queues/batch.queue';
 import { createBatchWorker } from './queues/batch.worker';

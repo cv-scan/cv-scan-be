@@ -73,7 +73,11 @@ const cvsRoutes: FastifyPluginAsyncZod = async (app) => {
       }
 
       if (uploaded.length === 0 && failed.length === 0) {
-        throw new AppError('No file attached. Please include at least one PDF or DOCX file.', 400, 'NO_FILE');
+        throw new AppError(
+          'No file attached. Please include at least one PDF or DOCX file.',
+          400,
+          'NO_FILE',
+        );
       }
 
       return reply.status(201).send({ data: uploaded, failed });
@@ -123,11 +127,7 @@ const cvsRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const cv = await cvsService.getById(
-        request.params.id,
-        request.user.sub,
-        request.user.role,
-      );
+      const cv = await cvsService.getById(request.params.id, request.user.sub, request.user.role);
       return reply.send(serializeDetail(cv));
     },
   );

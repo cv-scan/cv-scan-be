@@ -115,9 +115,9 @@ export class NlpScoringService {
 
   private getRecommendation(score: number): string {
     if (score >= 0.85) return 'STRONG_YES';
-    if (score >= 0.70) return 'YES';
+    if (score >= 0.7) return 'YES';
     if (score >= 0.55) return 'MAYBE';
-    if (score >= 0.40) return 'NO';
+    if (score >= 0.4) return 'NO';
     return 'STRONG_NO';
   }
 }

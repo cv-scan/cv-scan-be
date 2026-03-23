@@ -33,8 +33,13 @@ export class UsersService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, email: true, name: true, role: true, isActive: true,
-          createdAt: true, updatedAt: true,
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
         },
       }),
       prisma.user.count({ where }),
@@ -47,8 +52,13 @@ export class UsersService {
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
-        id: true, email: true, name: true, role: true, isActive: true,
-        createdAt: true, updatedAt: true,
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
     if (!user) throw new NotFoundError('User');
@@ -61,8 +71,13 @@ export class UsersService {
       where: { id },
       data: dto,
       select: {
-        id: true, email: true, name: true, role: true, isActive: true,
-        createdAt: true, updatedAt: true,
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   }

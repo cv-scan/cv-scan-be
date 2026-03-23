@@ -1,10 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors';
 
-export async function authenticate(
-  request: FastifyRequest,
-  _reply: FastifyReply,
-): Promise<void> {
+export async function authenticate(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   try {
     await request.jwtVerify();
   } catch {

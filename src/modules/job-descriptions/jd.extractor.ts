@@ -78,7 +78,9 @@ function extractLocation(text: string): string | undefined {
 }
 
 function extractEmploymentType(text: string): string | undefined {
-  const m = text.match(/(?:thời\s*gian|employment\s*type|hình\s*thức(?:\s*làm\s*việc)?)\s*:\s*(.+)/i);
+  const m = text.match(
+    /(?:thời\s*gian|employment\s*type|hình\s*thức(?:\s*làm\s*việc)?)\s*:\s*(.+)/i,
+  );
   if (!m) return undefined;
   const raw = cleanValue(m[1]);
   const hasFullTime = /full.?time|toàn\s*thời\s*gian/i.test(raw);
@@ -113,7 +115,7 @@ function extractExperienceLevel(text: string): string | undefined {
 function extractExperienceYears(text: string): number | undefined {
   const m = text.match(/(\d+)\+?\s*(?:năm|years?)\s*(?:kinh\s*nghiệm|experience)?/i);
   if (!m) return undefined;
-  const n = parseInt(m[1], 10);
+  const n = Number.parseInt(m[1], 10);
   return Number.isNaN(n) ? undefined : n;
 }
 

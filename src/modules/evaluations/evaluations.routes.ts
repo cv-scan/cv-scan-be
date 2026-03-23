@@ -59,7 +59,11 @@ const evaluationsRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const evaluation = await evaluationsService.evaluate(request.body, request.user.sub, request.user.role);
+      const evaluation = await evaluationsService.evaluate(
+        request.body,
+        request.user.sub,
+        request.user.role,
+      );
       return reply.status(201).send(serialize(evaluation));
     },
   );
@@ -131,7 +135,11 @@ const evaluationsRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const evaluation = await evaluationsService.getById(request.params.id, request.user.sub, request.user.role);
+      const evaluation = await evaluationsService.getById(
+        request.params.id,
+        request.user.sub,
+        request.user.role,
+      );
       return reply.send(serialize(evaluation));
     },
   );

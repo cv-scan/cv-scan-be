@@ -27,9 +27,7 @@ export function errorHandler(
   // Fastify errors (e.g. 404 from route not found)
   if ('statusCode' in error && typeof error.statusCode === 'number') {
     const message =
-      error.statusCode === 404
-        ? 'The requested endpoint does not exist.'
-        : error.message;
+      error.statusCode === 404 ? 'The requested endpoint does not exist.' : error.message;
     return reply.status(error.statusCode).send({
       statusCode: error.statusCode,
       error: error.name,

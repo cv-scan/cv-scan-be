@@ -10,9 +10,10 @@ export function extractExperienceYears(text: string): number {
 
   for (const pattern of EXPERIENCE_PATTERNS) {
     const copy = new RegExp(pattern.source, pattern.flags);
-    let match: RegExpExecArray | null;
-    while ((match = copy.exec(text)) !== null) {
-      const years = parseInt(match[1] ?? match[2] ?? '0', 10);
+    while (true) {
+      const match = copy.exec(text);
+      if (match === null) break;
+      const years = Number.parseInt(match[1] ?? match[2] ?? "0", 10);
       if (!Number.isNaN(years) && years > 0 && years < 50) {
         maxYears = Math.max(maxYears, years);
       }
@@ -43,15 +44,20 @@ export interface ExperienceScorerResult {
 }
 
 export class ExperienceScorer {
-  score(cvText: string, requiredYears: number | null | undefined): ExperienceScorerResult {
+  score(
+    cvText: string,
+    requiredYears: number | null | undefined,
+  ): ExperienceScorerResult {
     const extractedYears = extractExperienceYears(cvText);
 
     if (!requiredYears || requiredYears === 0) {
-      const rawScore = extractedYears > 0 ? Math.min(1, 0.5 + extractedYears * 0.04) : 0.3;
+      const rawScore =
+        extractedYears > 0 ? Math.min(1, 0.5 + extractedYears * 0.04) : 0.3;
       return {
         rawScore,
-        rationale: 'No specific experience requirement',
-        evidence: extractedYears > 0 ? [`${extractedYears} years detected`] : [],
+        rationale: "No specific experience requirement",
+        evidence:
+          extractedYears > 0 ? [`${extractedYears} years detected`] : [],
         gaps: [],
         extractedYears,
       };
@@ -75,7 +81,8 @@ export class ExperienceScorer {
     return {
       rawScore,
       rationale: `Detected ${extractedYears}y experience, required ${requiredYears}y`,
-      evidence: extractedYears > 0 ? [`${extractedYears} years of experience`] : [],
+      evidence:
+        extractedYears > 0 ? [`${extractedYears} years of experience`] : [],
       gaps,
       extractedYears,
     };

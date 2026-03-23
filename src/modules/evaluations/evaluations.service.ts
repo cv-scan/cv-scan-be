@@ -1,8 +1,12 @@
-import { prisma } from '../../config/database.config';
-import type { JdContext } from '../../services/scoring/nlp.service';
-import { nlpScoringService } from '../../services/scoring/nlp.service';
-import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
-import { type Classification, classify, type CreateEvaluationDto } from './evaluations.schema';
+import { prisma } from "../../config/database.config";
+import type { JdContext } from "../../services/scoring/nlp.service";
+import { nlpScoringService } from "../../services/scoring/nlp.service";
+import { AppError, ForbiddenError, NotFoundError } from "../../utils/errors";
+import {
+  type Classification,
+  type CreateEvaluationDto,
+  classify,
+} from "./evaluations.schema";
 
 export class EvaluationsService {
   // Single evaluation — synchronous per CLAUDE.md
@@ -12,19 +16,34 @@ export class EvaluationsService {
       prisma.jobDescription.findUnique({ where: { id: dto.jobDescriptionId } }),
     ]);
 
-    if (!cv) throw new NotFoundError('CV');
-    if (!jd) throw new NotFoundError('Job Description');
-    if (!jd.isActive) throw new AppError('This job description is no longer active and cannot be used for evaluation.', 400, 'JD_INACTIVE');
-    if (role !== 'ADMIN' && cv.uploadedBy !== userId) throw new ForbiddenError();
-    if (role !== 'ADMIN' && jd.createdBy !== userId) throw new ForbiddenError();
+    if (!cv) throw new NotFoundError("CV");
+    if (!jd) throw new NotFoundError("Job Description");
+    if (!jd.isActive)
+      throw new AppError(
+        "This job description is no longer active and cannot be used for evaluation.",
+        400,
+        "JD_INACTIVE",
+      );
+    if (role !== "ADMIN" && cv.uploadedBy !== userId)
+      throw new ForbiddenError();
+    if (role !== "ADMIN" && jd.createdBy !== userId) throw new ForbiddenError();
 
-    if (cv.parseStatus !== 'COMPLETED' || !cv.extractedText) {
-      throw new AppError('This CV is still being processed. Please wait a moment and try again.', 400, 'CV_NOT_PARSED');
+    if (cv.parseStatus !== "COMPLETED" || !cv.extractedText) {
+      throw new AppError(
+        "This CV is still being processed. Please wait a moment and try again.",
+        400,
+        "CV_NOT_PARSED",
+      );
     }
 
     // Upsert: if evaluation exists, overwrite scores
     let evaluation = await prisma.evaluation.findUnique({
-      where: { cvId_jobDescriptionId: { cvId: dto.cvId, jobDescriptionId: dto.jobDescriptionId } },
+      where: {
+        cvId_jobDescriptionId: {
+          cvId: dto.cvId,
+          jobDescriptionId: dto.jobDescriptionId,
+        },
+      },
     });
 
     if (evaluation) {
@@ -33,7 +52,7 @@ export class EvaluationsService {
       evaluation = await prisma.evaluation.update({
         where: { id: evaluation.id },
         data: {
-          status: 'PROCESSING',
+          status: "PROCESSING",
           startedAt: new Date(),
           completedAt: null,
           overallScore: null,
@@ -47,7 +66,7 @@ export class EvaluationsService {
         data: {
           cvId: dto.cvId,
           jobDescriptionId: dto.jobDescriptionId,
-          status: 'PROCESSING',
+          status: "PROCESSING",
           startedAt: new Date(),
           triggeredBy: userId,
         },
@@ -76,11 +95,11 @@ export class EvaluationsService {
           data: result.categories.map((cat) => ({
             evaluationId: evaluation.id,
             category: cat.category as
-              | 'SKILLS'
-              | 'EXPERIENCE'
-              | 'EDUCATION'
-              | 'ACHIEVEMENTS'
-              | 'RELEVANCE',
+              | "SKILLS"
+              | "EXPERIENCE"
+              | "EDUCATION"
+              | "ACHIEVEMENTS"
+              | "RELEVANCE",
             rawScore: cat.rawScore,
             weight: cat.weight,
             weightedScore: cat.weightedScore,
@@ -92,7 +111,7 @@ export class EvaluationsService {
         prisma.evaluation.update({
           where: { id: evaluation.id },
           data: {
-            status: 'COMPLETED',
+            status: "COMPLETED",
             overallScore: result.overallScore,
             recommendation: result.recommendation,
             processingTimeMs: result.processingTimeMs,
@@ -119,8 +138,8 @@ export class EvaluationsService {
       await prisma.evaluation.update({
         where: { id: evaluation.id },
         data: {
-          status: 'FAILED',
-          errorMessage: err instanceof Error ? err.message : 'Scoring failed',
+          status: "FAILED",
+          errorMessage: err instanceof Error ? err.message : "Scoring failed",
         },
       });
       throw err;
@@ -137,23 +156,42 @@ export class EvaluationsService {
     userId: string;
     role: string;
   }) {
-    const { page, limit, cvId, jobDescriptionId, status, classification, userId, role } = params;
+    const {
+      page,
+      limit,
+      cvId,
+      jobDescriptionId,
+      status,
+      classification,
+      userId,
+      role,
+    } = params;
     const skip = (page - 1) * limit;
 
     // Map classification filter to score ranges
-    const scoreFilter = classification === 'PASS'
-      ? { overallScore: { gt: 70 } }
-      : classification === 'WAITLIST'
-        ? { overallScore: { gte: 40, lte: 70 } }
-        : classification === 'FAIL'
-          ? { overallScore: { lt: 40 } }
-          : {};
+    const scoreFilter =
+      classification === "PASS"
+        ? { overallScore: { gt: 70 } }
+        : classification === "WAITLIST"
+          ? { overallScore: { gte: 40, lte: 70 } }
+          : classification === "FAIL"
+            ? { overallScore: { lt: 40 } }
+            : {};
 
     const where = {
-      ...(role !== 'ADMIN' ? { cv: { uploadedBy: userId } } : {}),
+      ...(role !== "ADMIN" ? { cv: { uploadedBy: userId } } : {}),
       ...(cvId ? { cvId } : {}),
       ...(jobDescriptionId ? { jobDescriptionId } : {}),
-      ...(status ? { status: status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' } : {}),
+      ...(status
+        ? {
+            status: status as
+              | "PENDING"
+              | "PROCESSING"
+              | "COMPLETED"
+              | "FAILED"
+              | "CANCELLED",
+          }
+        : {}),
       ...scoreFilter,
     };
 
@@ -162,7 +200,7 @@ export class EvaluationsService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           scores: true,
           cv: { select: { candidateName: true } },
@@ -192,8 +230,9 @@ export class EvaluationsService {
         jobDescription: { select: { title: true } },
       },
     });
-    if (!evaluation) throw new NotFoundError('Evaluation');
-    if (role !== 'ADMIN' && evaluation.cv.uploadedBy !== userId) throw new ForbiddenError();
+    if (!evaluation) throw new NotFoundError("Evaluation");
+    if (role !== "ADMIN" && evaluation.cv.uploadedBy !== userId)
+      throw new ForbiddenError();
     return {
       ...evaluation,
       candidateName: evaluation.cv.candidateName,
@@ -202,15 +241,19 @@ export class EvaluationsService {
     };
   }
 
-  async getStats(params: { jobDescriptionId?: string; userId: string; role: string }) {
+  async getStats(params: {
+    jobDescriptionId?: string;
+    userId: string;
+    role: string;
+  }) {
     const { jobDescriptionId, userId, role } = params;
 
     const evaluations = await prisma.evaluation.findMany({
       where: {
-        status: 'COMPLETED',
+        status: "COMPLETED",
         overallScore: { not: null },
         ...(jobDescriptionId ? { jobDescriptionId } : {}),
-        ...(role !== 'ADMIN' ? { cv: { uploadedBy: userId } } : {}),
+        ...(role !== "ADMIN" ? { cv: { uploadedBy: userId } } : {}),
       },
       select: {
         jobDescriptionId: true,
@@ -220,7 +263,10 @@ export class EvaluationsService {
     });
 
     // Group by JD and count classifications
-    const groups = new Map<string, { jdTitle: string; pass: number; waitlist: number; fail: number }>();
+    const groups = new Map<
+      string,
+      { jdTitle: string; pass: number; waitlist: number; fail: number }
+    >();
 
     for (const ev of evaluations) {
       if (!groups.has(ev.jobDescriptionId)) {
@@ -231,11 +277,12 @@ export class EvaluationsService {
           fail: 0,
         });
       }
-      const g = groups.get(ev.jobDescriptionId)!;
+      const g = groups.get(ev.jobDescriptionId);
+      if (!g) continue;
       const c = classify(ev.overallScore);
-      if (c === 'PASS') g.pass++;
-      else if (c === 'WAITLIST') g.waitlist++;
-      else if (c === 'FAIL') g.fail++;
+      if (c === "PASS") g.pass++;
+      else if (c === "WAITLIST") g.waitlist++;
+      else if (c === "FAIL") g.fail++;
     }
 
     return Array.from(groups.entries()).map(([jdId, g]) => ({

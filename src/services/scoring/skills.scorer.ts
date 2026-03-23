@@ -90,9 +90,7 @@ export class SkillsScorer {
       preferredSkills.length > 0 ? matchedPreferred.length / preferredSkills.length : 0.5;
 
     const rawScore =
-      requiredSkills.length > 0
-        ? requiredScore * 0.7 + preferredScore * 0.3
-        : preferredScore;
+      requiredSkills.length > 0 ? requiredScore * 0.7 + preferredScore * 0.3 : preferredScore;
 
     return {
       rawScore: Math.min(1, rawScore),

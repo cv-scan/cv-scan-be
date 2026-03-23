@@ -31,8 +31,9 @@ export class AchievementsScorer {
 
     for (const pattern of ACHIEVEMENT_PATTERNS) {
       const copy = new RegExp(pattern.source, pattern.flags);
-      let match: RegExpExecArray | null;
-      while ((match = copy.exec(cvText)) !== null) {
+      while (true) {
+        const match = copy.exec(cvText);
+        if (match === null) break;
         const key = match[0].toLowerCase().slice(0, 60);
         if (!seen.has(key)) {
           seen.add(key);
@@ -53,9 +54,9 @@ export class AchievementsScorer {
 
     return {
       rawScore,
-      rationale: `Found ${count} quantifiable achievement${count !== 1 ? 's' : ''}`,
+      rationale: `Found ${count} quantifiable achievement${count !== 1 ? "s" : ""}`,
       evidence: achievements.slice(0, 10),
-      gaps: count === 0 ? ['No quantifiable achievements detected'] : [],
+      gaps: count === 0 ? ["No quantifiable achievements detected"] : [],
       achievementCount: count,
     };
   }

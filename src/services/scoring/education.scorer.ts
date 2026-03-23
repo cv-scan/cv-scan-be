@@ -100,7 +100,9 @@ export class EducationScorer {
 
     const gaps =
       detectedLevel < requiredLevel
-        ? [`Requires ${LEVEL_NAMES[requiredLevel]}, detected ${LEVEL_NAMES[detectedLevel] ?? 'None'}`]
+        ? [
+            `Requires ${LEVEL_NAMES[requiredLevel]}, detected ${LEVEL_NAMES[detectedLevel] ?? 'None'}`,
+          ]
         : [];
 
     return {

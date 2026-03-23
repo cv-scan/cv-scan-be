@@ -32,7 +32,11 @@ export class CvsService {
     }
 
     if (!isAllowedMimeType(mimetype)) {
-      throw new AppError('Unsupported file type. Please upload a PDF or DOCX file.', 400, 'UNSUPPORTED_FILE_TYPE');
+      throw new AppError(
+        'Unsupported file type. Please upload a PDF or DOCX file.',
+        400,
+        'UNSUPPORTED_FILE_TYPE',
+      );
     }
 
     const candidateName = extractNameFromFilename(filename);
@@ -84,7 +88,9 @@ export class CvsService {
 
     const where = {
       ...(role !== 'ADMIN' ? { uploadedBy: userId } : {}),
-      ...(parseStatus ? { parseStatus: parseStatus as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' } : {}),
+      ...(parseStatus
+        ? { parseStatus: parseStatus as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -103,10 +109,17 @@ export class CvsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, candidateName: true, candidateEmail: true,
-          fileName: true, fileType: true, fileSize: true,
-          parseStatus: true, parseError: true,
-          uploadedBy: true, createdAt: true, updatedAt: true,
+          id: true,
+          candidateName: true,
+          candidateEmail: true,
+          fileName: true,
+          fileType: true,
+          fileSize: true,
+          parseStatus: true,
+          parseError: true,
+          uploadedBy: true,
+          createdAt: true,
+          updatedAt: true,
         },
       }),
       prisma.cV.count({ where }),

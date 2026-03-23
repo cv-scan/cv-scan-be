@@ -23,10 +23,10 @@ export class JdService {
         requiredSkills,
         preferredSkills,
         weightSkills: weights?.skills ?? 0.35,
-        weightExperience: weights?.experience ?? 0.30,
+        weightExperience: weights?.experience ?? 0.3,
         weightEducation: weights?.education ?? 0.15,
-        weightAchievements: weights?.achievements ?? 0.10,
-        weightRelevance: weights?.relevance ?? 0.10,
+        weightAchievements: weights?.achievements ?? 0.1,
+        weightRelevance: weights?.relevance ?? 0.1,
         createdBy: userId,
       },
     });
@@ -34,7 +34,11 @@ export class JdService {
 
   async uploadFromFile(buffer: Buffer, mimetype: string, query: UploadJdQueryDto, userId: string) {
     if (!isAllowedMimeType(mimetype)) {
-      throw new AppError('Unsupported file type. Please upload a PDF or DOCX file.', 400, 'UNSUPPORTED_FILE_TYPE');
+      throw new AppError(
+        'Unsupported file type. Please upload a PDF or DOCX file.',
+        400,
+        'UNSUPPORTED_FILE_TYPE',
+      );
     }
 
     const content = await parseFile(buffer, mimetype);
@@ -62,10 +66,10 @@ export class JdService {
         requiredSkills: metadata.requiredSkills,
         preferredSkills: metadata.preferredSkills,
         weightSkills: 0.35,
-        weightExperience: 0.30,
+        weightExperience: 0.3,
         weightEducation: 0.15,
-        weightAchievements: 0.10,
-        weightRelevance: 0.10,
+        weightAchievements: 0.1,
+        weightRelevance: 0.1,
         createdBy: userId,
       },
     });

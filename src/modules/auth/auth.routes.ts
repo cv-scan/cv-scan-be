@@ -10,9 +10,11 @@ import {
   tokenResponseSchema,
   userResponseSchema,
 } from './auth.schema';
-import { authService, type SignJwt } from './auth.service';
+import { type SignJwt, authService } from './auth.service';
 
-function makeSign(app: { jwt: { sign: (payload: { sub: string; email: string; role: string }) => string } }): SignJwt {
+function makeSign(app: {
+  jwt: { sign: (payload: { sub: string; email: string; role: string }) => string };
+}): SignJwt {
   return (payload) => app.jwt.sign(payload);
 }
 

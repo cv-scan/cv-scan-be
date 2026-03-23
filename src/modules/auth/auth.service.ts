@@ -43,10 +43,7 @@ export class AuthService {
     return { user: this.toAuthUser(user), tokens };
   }
 
-  async login(
-    dto: LoginDto,
-    signJwt: SignJwt,
-  ): Promise<{ user: AuthUser; tokens: AuthTokens }> {
+  async login(dto: LoginDto, signJwt: SignJwt): Promise<{ user: AuthUser; tokens: AuthTokens }> {
     const user = await prisma.user.findUnique({ where: { email: dto.email } });
     if (!user || !user.isActive) {
       throw new UnauthorizedError('Invalid credentials');
@@ -61,10 +58,7 @@ export class AuthService {
     return { user: this.toAuthUser(user), tokens };
   }
 
-  async refresh(
-    refreshToken: string,
-    signJwt: SignJwt,
-  ): Promise<AuthTokens> {
+  async refresh(refreshToken: string, signJwt: SignJwt): Promise<AuthTokens> {
     const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
 
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
@@ -127,7 +121,7 @@ export class AuthService {
   private parseExpiresIn(value: string): number {
     const match = value.match(/^(\d+)([smhd])$/);
     if (!match) return 15 * 60 * 1000;
-    const num = parseInt(match[1], 10);
+    const num = Number.parseInt(match[1], 10);
     const unit = match[2];
     const multipliers: Record<string, number> = {
       s: 1000,

@@ -1,6 +1,6 @@
-import { Queue } from 'bullmq';
-import { env } from '../config/env';
-import { redisConnection } from './redis';
+import { Queue } from "bullmq";
+import { env } from "../config/env";
+import { redisConnection } from "./redis";
 
 export interface EvaluationJobData {
   batchId: string;
@@ -9,17 +9,19 @@ export interface EvaluationJobData {
   jobDescriptionId: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _queue: Queue<EvaluationJobData, any, string> | null = null;
+let _queue: Queue<EvaluationJobData, unknown, string> | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getEvaluationQueue(): Queue<EvaluationJobData, any, string> {
+export function getEvaluationQueue(): Queue<
+  EvaluationJobData,
+  unknown,
+  string
+> {
   if (_queue) return _queue;
-  _queue = new Queue<EvaluationJobData>('cv-evaluation', {
+  _queue = new Queue<EvaluationJobData>("cv-evaluation", {
     connection: redisConnection,
     defaultJobOptions: {
       attempts: env.QUEUE_JOB_ATTEMPTS,
-      backoff: { type: 'fixed', delay: 1000 },
+      backoff: { type: "fixed", delay: 1000 },
       removeOnComplete: 100,
       removeOnFail: 200,
     },

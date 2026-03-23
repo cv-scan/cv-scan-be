@@ -3,10 +3,10 @@ import { z } from 'zod';
 const scoringWeightsSchema = z
   .object({
     skills: z.number().min(0).max(1).default(0.35),
-    experience: z.number().min(0).max(1).default(0.30),
+    experience: z.number().min(0).max(1).default(0.3),
     education: z.number().min(0).max(1).default(0.15),
-    achievements: z.number().min(0).max(1).default(0.10),
-    relevance: z.number().min(0).max(1).default(0.10),
+    achievements: z.number().min(0).max(1).default(0.1),
+    relevance: z.number().min(0).max(1).default(0.1),
   })
   .refine(
     (w) => {

@@ -15,10 +15,7 @@ export async function parseFile(buffer: Buffer, mimeType: string): Promise<strin
   if (mimeType === 'application/pdf') {
     return parsePdf(buffer);
   }
-  if (
-    mimeType ===
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ) {
+  if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
     return parseDocx(buffer);
   }
   throw new AppError(`Unsupported file type: ${mimeType}`, 400, 'UNSUPPORTED_FILE_TYPE');

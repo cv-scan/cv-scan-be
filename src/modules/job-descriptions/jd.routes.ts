@@ -53,10 +53,20 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request, reply) => {
       const data = await request.file();
-      if (!data) throw new AppError('No file attached. Please include a PDF or DOCX file in your request.', 400, 'NO_FILE');
+      if (!data)
+        throw new AppError(
+          'No file attached. Please include a PDF or DOCX file in your request.',
+          400,
+          'NO_FILE',
+        );
 
       const buffer = await data.toBuffer();
-      const jd = await jdService.uploadFromFile(buffer, data.mimetype, request.query, request.user.sub);
+      const jd = await jdService.uploadFromFile(
+        buffer,
+        data.mimetype,
+        request.query,
+        request.user.sub,
+      );
       return reply.status(201).send(serialize(jd));
     },
   );
@@ -124,11 +134,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const jd = await jdService.getById(
-        request.params.id,
-        request.user.sub,
-        request.user.role,
-      );
+      const jd = await jdService.getById(request.params.id, request.user.sub, request.user.role);
       return reply.send(serialize(jd));
     },
   );
@@ -168,11 +174,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const jd = await jdService.softDelete(
-        request.params.id,
-        request.user.sub,
-        request.user.role,
-      );
+      const jd = await jdService.softDelete(request.params.id, request.user.sub, request.user.role);
       return reply.send(serialize(jd));
     },
   );

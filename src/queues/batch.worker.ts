@@ -1,9 +1,9 @@
 import { Worker } from 'bullmq';
 import { prisma } from '../config/database.config';
 import { env } from '../config/env';
-import { redisConnection } from './redis';
 import type { BatchJobData } from './batch.queue';
 import { getEvaluationQueue } from './evaluation.queue';
+import { redisConnection } from './redis';
 
 export function createBatchWorker() {
   const worker = new Worker<BatchJobData>(
