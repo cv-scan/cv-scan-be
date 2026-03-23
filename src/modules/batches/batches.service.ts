@@ -1,13 +1,9 @@
-import { prisma } from "../../config/database.config";
-import { AppError, NotFoundError } from "../../utils/errors";
-import type { CreateBatchDto } from "./batches.schema";
+import { prisma } from '../../config/database.config';
+import { AppError, NotFoundError } from '../../utils/errors';
+import type { CreateBatchDto } from './batches.schema';
 
 // Set after server initializes queues (avoid circular imports)
-type QueueFactory = () => import("bullmq").Queue<
-  { batchId: string },
-  unknown,
-  string
->;
+type QueueFactory = () => import('bullmq').Queue<{ batchId: string }, unknown, string>;
 let getBatchQueue: QueueFactory | null = null;
 
 export function setBatchQueueFactory(factory: QueueFactory) {
@@ -19,12 +15,12 @@ export class BatchesService {
     const jd = await prisma.jobDescription.findUnique({
       where: { id: dto.jobDescriptionId },
     });
-    if (!jd) throw new NotFoundError("Job Description");
+    if (!jd) throw new NotFoundError('Job Description');
     if (!jd.isActive)
       throw new AppError(
-        "This job description is no longer active and cannot be used for batch evaluation.",
+        'This job description is no longer active and cannot be used for batch evaluation.',
         400,
-        "JD_INACTIVE",
+        'JD_INACTIVE',
       );
 
     // Validate all CVs exist
@@ -34,9 +30,9 @@ export class BatchesService {
     });
     if (cvs.length !== dto.cvIds.length) {
       throw new AppError(
-        "Some CVs in your selection could not be found. Please verify the IDs and try again.",
+        'Some CVs in your selection could not be found. Please verify the IDs and try again.',
         400,
-        "CVS_NOT_FOUND",
+        'CVS_NOT_FOUND',
       );
     }
 
@@ -57,7 +53,7 @@ export class BatchesService {
     if (getBatchQueue) {
       const queue = getBatchQueue();
       const job = await queue.add(
-        "process-batch",
+        'process-batch',
         { batchId: batch.id },
         { jobId: `batch-${batch.id}` },
       );
@@ -85,12 +81,12 @@ export class BatchesService {
       ...(status
         ? {
             status: status as
-              | "PENDING"
-              | "PROCESSING"
-              | "COMPLETED"
-              | "PARTIALLY_FAILED"
-              | "FAILED"
-              | "CANCELLED",
+              | 'PENDING'
+              | 'PROCESSING'
+              | 'COMPLETED'
+              | 'PARTIALLY_FAILED'
+              | 'FAILED'
+              | 'CANCELLED',
           }
         : {}),
     };
@@ -100,7 +96,7 @@ export class BatchesService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
       }),
       prisma.batch.count({ where }),
     ]);
@@ -120,25 +116,25 @@ export class BatchesService {
         },
       },
     });
-    if (!batch) throw new NotFoundError("Batch");
-    if (role !== "ADMIN" && batch.createdBy !== userId) {
-      throw new AppError("Access denied", 403, "FORBIDDEN");
+    if (!batch) throw new NotFoundError('Batch');
+    if (role !== 'ADMIN' && batch.createdBy !== userId) {
+      throw new AppError('Access denied', 403, 'FORBIDDEN');
     }
     return batch;
   }
 
   async cancel(id: string, userId: string, role: string) {
     const batch = await this.getById(id, userId, role);
-    if (!["PENDING", "PROCESSING"].includes(batch.status)) {
+    if (!['PENDING', 'PROCESSING'].includes(batch.status)) {
       throw new AppError(
-        "Only PENDING or PROCESSING batches can be cancelled",
+        'Only PENDING or PROCESSING batches can be cancelled',
         400,
-        "INVALID_STATUS",
+        'INVALID_STATUS',
       );
     }
     return prisma.batch.update({
       where: { id },
-      data: { status: "CANCELLED" },
+      data: { status: 'CANCELLED' },
     });
   }
 }

@@ -1,21 +1,21 @@
-import { Worker } from "bullmq";
-import { prisma } from "../config/database.config";
-import { env } from "../config/env";
-import type { JdContext } from "../services/scoring/nlp.service";
-import { nlpScoringService } from "../services/scoring/nlp.service";
-import type { EvaluationJobData } from "./evaluation.queue";
-import { redisConnection } from "./redis";
+import { Worker } from 'bullmq';
+import { prisma } from '../config/database.config';
+import { env } from '../config/env';
+import type { JdContext } from '../services/scoring/nlp.service';
+import { nlpScoringService } from '../services/scoring/nlp.service';
+import type { EvaluationJobData } from './evaluation.queue';
+import { redisConnection } from './redis';
 
 export function createEvaluationWorker() {
   const worker = new Worker<EvaluationJobData>(
-    "cv-evaluation",
+    'cv-evaluation',
     async (job) => {
       const { batchId, batchItemId, cvId, jobDescriptionId } = job.data;
 
       // Update batch item status
       await prisma.batchItem.update({
         where: { id: batchItemId },
-        data: { status: "PROCESSING" },
+        data: { status: 'PROCESSING' },
       });
 
       const [cv, jd] = await Promise.all([
@@ -23,10 +23,10 @@ export function createEvaluationWorker() {
         prisma.jobDescription.findUnique({ where: { id: jobDescriptionId } }),
       ]);
 
-      if (!cv || !jd || cv.parseStatus !== "COMPLETED" || !cv.extractedText) {
+      if (!cv || !jd || cv.parseStatus !== 'COMPLETED' || !cv.extractedText) {
         await prisma.batchItem.update({
           where: { id: batchItemId },
-          data: { status: "FAILED" },
+          data: { status: 'FAILED' },
         });
         await incrementBatchFailed(batchId);
         return;
@@ -44,7 +44,7 @@ export function createEvaluationWorker() {
             return prisma.evaluation.update({
               where: { id: existingEvaluation.id },
               data: {
-                status: "PROCESSING",
+                status: 'PROCESSING',
                 startedAt: new Date(),
                 completedAt: null,
                 overallScore: null,
@@ -56,10 +56,10 @@ export function createEvaluationWorker() {
             data: {
               cvId,
               jobDescriptionId,
-              status: "PROCESSING",
+              status: 'PROCESSING',
               startedAt: new Date(),
               batchItemId,
-              triggeredBy: "batch",
+              triggeredBy: 'batch',
             },
           });
 
@@ -77,21 +77,18 @@ export function createEvaluationWorker() {
           weightRelevance: jd.weightRelevance,
         };
 
-        const result = await nlpScoringService.score(
-          cv.extractedText,
-          jdContext,
-        );
+        const result = await nlpScoringService.score(cv.extractedText, jdContext);
 
         await prisma.$transaction([
           prisma.score.createMany({
             data: result.categories.map((cat) => ({
               evaluationId: evaluation.id,
               category: cat.category as
-                | "SKILLS"
-                | "EXPERIENCE"
-                | "EDUCATION"
-                | "ACHIEVEMENTS"
-                | "RELEVANCE",
+                | 'SKILLS'
+                | 'EXPERIENCE'
+                | 'EDUCATION'
+                | 'ACHIEVEMENTS'
+                | 'RELEVANCE',
               rawScore: cat.rawScore,
               weight: cat.weight,
               weightedScore: cat.weightedScore,
@@ -103,7 +100,7 @@ export function createEvaluationWorker() {
           prisma.evaluation.update({
             where: { id: evaluation.id },
             data: {
-              status: "COMPLETED",
+              status: 'COMPLETED',
               overallScore: result.overallScore,
               recommendation: result.recommendation,
               processingTimeMs: result.processingTimeMs,
@@ -112,7 +109,7 @@ export function createEvaluationWorker() {
           }),
           prisma.batchItem.update({
             where: { id: batchItemId },
-            data: { status: "COMPLETED" },
+            data: { status: 'COMPLETED' },
           }),
         ]);
 
@@ -121,13 +118,13 @@ export function createEvaluationWorker() {
         await prisma.evaluation.update({
           where: { id: evaluation.id },
           data: {
-            status: "FAILED",
-            errorMessage: err instanceof Error ? err.message : "Failed",
+            status: 'FAILED',
+            errorMessage: err instanceof Error ? err.message : 'Failed',
           },
         });
         await prisma.batchItem.update({
           where: { id: batchItemId },
-          data: { status: "FAILED" },
+          data: { status: 'FAILED' },
         });
         await incrementBatchFailed(batchId);
         throw err; // Let BullMQ handle retry
@@ -139,7 +136,7 @@ export function createEvaluationWorker() {
     },
   );
 
-  worker.on("failed", (job, err) => {
+  worker.on('failed', (job, err) => {
     console.error(`Evaluation job ${job?.id} failed:`, err.message);
   });
 
@@ -173,10 +170,10 @@ async function checkBatchCompletion(batch: {
   if (processed >= batch.totalCount) {
     const finalStatus =
       batch.failedCount === 0
-        ? "COMPLETED"
+        ? 'COMPLETED'
         : batch.completedCount === 0
-          ? "FAILED"
-          : "PARTIALLY_FAILED";
+          ? 'FAILED'
+          : 'PARTIALLY_FAILED';
 
     await prisma.batch.update({
       where: { id: batch.id },

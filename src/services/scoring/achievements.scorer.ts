@@ -54,9 +54,9 @@ export class AchievementsScorer {
 
     return {
       rawScore,
-      rationale: `Found ${count} quantifiable achievement${count !== 1 ? "s" : ""}`,
+      rationale: `Found ${count} quantifiable achievement${count !== 1 ? 's' : ''}`,
       evidence: achievements.slice(0, 10),
-      gaps: count === 0 ? ["No quantifiable achievements detected"] : [],
+      gaps: count === 0 ? ['No quantifiable achievements detected'] : [],
       achievementCount: count,
     };
   }
