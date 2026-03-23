@@ -17,7 +17,7 @@ export class BatchesService {
       where: { id: dto.jobDescriptionId },
     });
     if (!jd) throw new NotFoundError('Job Description');
-    if (!jd.isActive) throw new AppError('Job Description is inactive', 400, 'JD_INACTIVE');
+    if (!jd.isActive) throw new AppError('This job description is no longer active and cannot be used for batch evaluation.', 400, 'JD_INACTIVE');
 
     // Validate all CVs exist
     const cvs = await prisma.cV.findMany({
@@ -25,7 +25,7 @@ export class BatchesService {
       select: { id: true, parseStatus: true },
     });
     if (cvs.length !== dto.cvIds.length) {
-      throw new AppError('One or more CVs not found', 400, 'CVS_NOT_FOUND');
+      throw new AppError('Some CVs in your selection could not be found. Please verify the IDs and try again.', 400, 'CVS_NOT_FOUND');
     }
 
     const batch = await prisma.batch.create({

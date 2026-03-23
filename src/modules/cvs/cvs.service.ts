@@ -1,9 +1,20 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { prisma } from '../../config/database.config';
-import { parseFile, isAllowedMimeType } from '../../services/parser';
+import { isAllowedMimeType, parseFile } from '../../services/parser';
 import { getStorage } from '../../services/storage';
 import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
+
+function extractNameFromFilename(filename: string): string {
+  const base = path.basename(filename, path.extname(filename));
+  const cleaned = base
+    .replace(/^(cv|resume|curriculum.?vitae)[-_\s]*/i, '')
+    .replace(/[-_\s]*(cv|resume|curriculum.?vitae|application)$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .trim();
+  const name = cleaned || base.replace(/[-_]+/g, ' ').trim() || 'Unknown';
+  return name.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export class CvsService {
   async upload(params: {
@@ -11,29 +22,26 @@ export class CvsService {
     filename: string;
     mimetype: string;
     filesize: number;
-    candidateName: string;
-    candidateEmail?: string;
     uploadedBy: string;
   }) {
-    const { buffer, filename, mimetype, filesize, candidateName, candidateEmail, uploadedBy } =
-      params;
+    const { buffer, filename, mimetype, filesize, uploadedBy } = params;
 
     const maxBytes = 10 * 1024 * 1024;
     if (filesize > maxBytes) {
-      throw new AppError('File size exceeds 10MB limit', 400, 'FILE_TOO_LARGE');
+      throw new AppError('File is too large. Maximum allowed size is 10MB.', 400, 'FILE_TOO_LARGE');
     }
 
     if (!isAllowedMimeType(mimetype)) {
-      throw new AppError('Only PDF and DOCX files are allowed', 400, 'UNSUPPORTED_FILE_TYPE');
+      throw new AppError('Unsupported file type. Please upload a PDF or DOCX file.', 400, 'UNSUPPORTED_FILE_TYPE');
     }
 
+    const candidateName = extractNameFromFilename(filename);
     const ext = path.extname(filename);
     const uniqueName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
 
     const storage = getStorage();
     const storagePath = await storage.save(uniqueName, buffer, mimetype);
 
-    // Parse text immediately
     let extractedText = '';
     let parseStatus: 'COMPLETED' | 'FAILED' = 'COMPLETED';
     let parseError: string | null = null;
@@ -48,7 +56,7 @@ export class CvsService {
     return prisma.cV.create({
       data: {
         candidateName,
-        candidateEmail,
+        candidateEmail: null,
         fileName: filename,
         fileType: mimetype,
         fileSize: filesize,

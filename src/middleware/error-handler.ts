@@ -11,7 +11,7 @@ export function errorHandler(
     return reply.status(400).send({
       statusCode: 400,
       error: 'VALIDATION_ERROR',
-      message: error.message,
+      message: 'The request contains invalid data. Please check your input and try again.',
     });
   }
 
@@ -26,10 +26,14 @@ export function errorHandler(
 
   // Fastify errors (e.g. 404 from route not found)
   if ('statusCode' in error && typeof error.statusCode === 'number') {
+    const message =
+      error.statusCode === 404
+        ? 'The requested endpoint does not exist.'
+        : error.message;
     return reply.status(error.statusCode).send({
       statusCode: error.statusCode,
       error: error.name,
-      message: error.message,
+      message,
     });
   }
 
@@ -38,6 +42,6 @@ export function errorHandler(
   return reply.status(500).send({
     statusCode: 500,
     error: 'INTERNAL_SERVER_ERROR',
-    message: 'An unexpected error occurred',
+    message: 'Something went wrong on our end. Please try again later.',
   });
 }

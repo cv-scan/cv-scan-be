@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { authenticate } from '../../middleware/authenticate';
 import { AppError } from '../../utils/errors';
 import {
+  cvBulkUploadResponseSchema,
   cvDetailResponseSchema,
   cvListQuerySchema,
   cvResponseSchema,
-  cvUploadQuerySchema,
 } from './cvs.schema';
 import { cvsService } from './cvs.service';
 
@@ -37,35 +37,46 @@ const serializeDetail = (cv: CvBase & { extractedText: string }) => ({
 });
 
 const cvsRoutes: FastifyPluginAsyncZod = async (app) => {
-  // POST / — upload CV
+  // POST / — upload one or more CVs (no extra info required)
   app.post(
     '/',
     {
       preHandler: [authenticate],
       schema: {
         tags: ['CVs'],
-        summary: 'Upload a CV (PDF or DOCX)',
-        querystring: cvUploadQuerySchema,
-        response: { 201: cvResponseSchema },
+        summary: 'Upload one or more CVs (PDF or DOCX). Candidate name is extracted from filename.',
+        response: { 201: cvBulkUploadResponseSchema },
       },
     },
     async (request, reply) => {
-      const data = await request.file();
-      if (!data) throw new AppError('No file uploaded', 400, 'NO_FILE');
+      const parts = request.files();
+      const uploaded: ReturnType<typeof serialize>[] = [];
+      const failed: { filename: string; reason: string }[] = [];
 
-      const buffer = await data.toBuffer();
+      for await (const part of parts) {
+        const buffer = await part.toBuffer();
+        try {
+          const cv = await cvsService.upload({
+            buffer,
+            filename: part.filename,
+            mimetype: part.mimetype,
+            filesize: buffer.length,
+            uploadedBy: request.user.sub,
+          });
+          uploaded.push(serialize(cv));
+        } catch (err) {
+          failed.push({
+            filename: part.filename,
+            reason: err instanceof Error ? err.message : 'Upload failed',
+          });
+        }
+      }
 
-      const cv = await cvsService.upload({
-        buffer,
-        filename: data.filename,
-        mimetype: data.mimetype,
-        filesize: buffer.length,
-        candidateName: request.query.candidateName,
-        candidateEmail: request.query.candidateEmail,
-        uploadedBy: request.user.sub,
-      });
+      if (uploaded.length === 0 && failed.length === 0) {
+        throw new AppError('No file attached. Please include at least one PDF or DOCX file.', 400, 'NO_FILE');
+      }
 
-      return reply.status(201).send(serialize(cv));
+      return reply.status(201).send({ data: uploaded, failed });
     },
   );
 

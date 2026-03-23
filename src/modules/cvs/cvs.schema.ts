@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-export const cvUploadQuerySchema = z.object({
-  candidateName: z.string().min(1).max(200),
-  candidateEmail: z.string().email().optional(),
-});
-
 export const cvListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -28,4 +23,14 @@ export const cvResponseSchema = z.object({
 
 export const cvDetailResponseSchema = cvResponseSchema.extend({
   extractedText: z.string(),
+});
+
+export const cvBulkUploadResponseSchema = z.object({
+  data: z.array(cvResponseSchema),
+  failed: z.array(
+    z.object({
+      filename: z.string(),
+      reason: z.string(),
+    }),
+  ),
 });

@@ -1,12 +1,12 @@
 import { prisma } from '../../config/database.config';
 import type { JdContext } from '../../services/scoring/nlp.service';
 import { nlpScoringService } from '../../services/scoring/nlp.service';
-import { AppError, NotFoundError } from '../../utils/errors';
-import type { CreateEvaluationDto } from './evaluations.schema';
+import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { type Classification, classify, type CreateEvaluationDto } from './evaluations.schema';
 
 export class EvaluationsService {
   // Single evaluation — synchronous per CLAUDE.md
-  async evaluate(dto: CreateEvaluationDto, triggeredBy: string) {
+  async evaluate(dto: CreateEvaluationDto, userId: string, role: string) {
     const [cv, jd] = await Promise.all([
       prisma.cV.findUnique({ where: { id: dto.cvId } }),
       prisma.jobDescription.findUnique({ where: { id: dto.jobDescriptionId } }),
@@ -14,10 +14,12 @@ export class EvaluationsService {
 
     if (!cv) throw new NotFoundError('CV');
     if (!jd) throw new NotFoundError('Job Description');
-    if (!jd.isActive) throw new AppError('Job Description is inactive', 400, 'JD_INACTIVE');
+    if (!jd.isActive) throw new AppError('This job description is no longer active and cannot be used for evaluation.', 400, 'JD_INACTIVE');
+    if (role !== 'ADMIN' && cv.uploadedBy !== userId) throw new ForbiddenError();
+    if (role !== 'ADMIN' && jd.createdBy !== userId) throw new ForbiddenError();
 
     if (cv.parseStatus !== 'COMPLETED' || !cv.extractedText) {
-      throw new AppError('CV has not been parsed yet', 400, 'CV_NOT_PARSED');
+      throw new AppError('This CV is still being processed. Please wait a moment and try again.', 400, 'CV_NOT_PARSED');
     }
 
     // Upsert: if evaluation exists, overwrite scores
@@ -37,7 +39,7 @@ export class EvaluationsService {
           overallScore: null,
           recommendation: null,
           errorMessage: null,
-          triggeredBy,
+          triggeredBy: userId,
         },
       });
     } else {
@@ -47,7 +49,7 @@ export class EvaluationsService {
           jobDescriptionId: dto.jobDescriptionId,
           status: 'PROCESSING',
           startedAt: new Date(),
-          triggeredBy,
+          triggeredBy: userId,
         },
       });
     }
@@ -99,10 +101,20 @@ export class EvaluationsService {
         }),
       ]);
 
-      return prisma.evaluation.findUniqueOrThrow({
+      const completed = await prisma.evaluation.findUniqueOrThrow({
         where: { id: evaluation.id },
-        include: { scores: true },
+        include: {
+          scores: true,
+          cv: { select: { candidateName: true } },
+          jobDescription: { select: { title: true } },
+        },
       });
+      return {
+        ...completed,
+        candidateName: completed.cv.candidateName,
+        jdTitle: completed.jobDescription.title,
+        classification: classify(completed.overallScore),
+      };
     } catch (err) {
       await prisma.evaluation.update({
         where: { id: evaluation.id },
@@ -121,14 +133,28 @@ export class EvaluationsService {
     cvId?: string;
     jobDescriptionId?: string;
     status?: string;
+    classification?: Classification;
+    userId: string;
+    role: string;
   }) {
-    const { page, limit, cvId, jobDescriptionId, status } = params;
+    const { page, limit, cvId, jobDescriptionId, status, classification, userId, role } = params;
     const skip = (page - 1) * limit;
 
+    // Map classification filter to score ranges
+    const scoreFilter = classification === 'PASS'
+      ? { overallScore: { gt: 70 } }
+      : classification === 'WAITLIST'
+        ? { overallScore: { gte: 40, lte: 70 } }
+        : classification === 'FAIL'
+          ? { overallScore: { lt: 40 } }
+          : {};
+
     const where = {
+      ...(role !== 'ADMIN' ? { cv: { uploadedBy: userId } } : {}),
       ...(cvId ? { cvId } : {}),
       ...(jobDescriptionId ? { jobDescriptionId } : {}),
       ...(status ? { status: status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' } : {}),
+      ...scoreFilter,
     };
 
     const [data, total] = await Promise.all([
@@ -137,21 +163,89 @@ export class EvaluationsService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { scores: true },
+        include: {
+          scores: true,
+          cv: { select: { candidateName: true } },
+          jobDescription: { select: { title: true } },
+        },
       }),
       prisma.evaluation.count({ where }),
     ]);
 
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: data.map((ev) => ({
+        ...ev,
+        candidateName: ev.cv.candidateName,
+        jdTitle: ev.jobDescription.title,
+        classification: classify(ev.overallScore),
+      })),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
-  async getById(id: string) {
+  async getById(id: string, userId: string, role: string) {
     const evaluation = await prisma.evaluation.findUnique({
       where: { id },
-      include: { scores: true },
+      include: {
+        scores: true,
+        cv: { select: { uploadedBy: true, candidateName: true } },
+        jobDescription: { select: { title: true } },
+      },
     });
     if (!evaluation) throw new NotFoundError('Evaluation');
-    return evaluation;
+    if (role !== 'ADMIN' && evaluation.cv.uploadedBy !== userId) throw new ForbiddenError();
+    return {
+      ...evaluation,
+      candidateName: evaluation.cv.candidateName,
+      jdTitle: evaluation.jobDescription.title,
+      classification: classify(evaluation.overallScore),
+    };
+  }
+
+  async getStats(params: { jobDescriptionId?: string; userId: string; role: string }) {
+    const { jobDescriptionId, userId, role } = params;
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: {
+        status: 'COMPLETED',
+        overallScore: { not: null },
+        ...(jobDescriptionId ? { jobDescriptionId } : {}),
+        ...(role !== 'ADMIN' ? { cv: { uploadedBy: userId } } : {}),
+      },
+      select: {
+        jobDescriptionId: true,
+        overallScore: true,
+        jobDescription: { select: { title: true } },
+      },
+    });
+
+    // Group by JD and count classifications
+    const groups = new Map<string, { jdTitle: string; pass: number; waitlist: number; fail: number }>();
+
+    for (const ev of evaluations) {
+      if (!groups.has(ev.jobDescriptionId)) {
+        groups.set(ev.jobDescriptionId, {
+          jdTitle: ev.jobDescription.title,
+          pass: 0,
+          waitlist: 0,
+          fail: 0,
+        });
+      }
+      const g = groups.get(ev.jobDescriptionId)!;
+      const c = classify(ev.overallScore);
+      if (c === 'PASS') g.pass++;
+      else if (c === 'WAITLIST') g.waitlist++;
+      else if (c === 'FAIL') g.fail++;
+    }
+
+    return Array.from(groups.entries()).map(([jdId, g]) => ({
+      jobDescriptionId: jdId,
+      jdTitle: g.jdTitle,
+      total: g.pass + g.waitlist + g.fail,
+      pass: g.pass,
+      waitlist: g.waitlist,
+      fail: g.fail,
+    }));
   }
 }
 

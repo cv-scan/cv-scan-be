@@ -5,6 +5,8 @@ import {
   createEvaluationSchema,
   evaluationListQuerySchema,
   evaluationResponseSchema,
+  evaluationStatsQuerySchema,
+  jdStatsSchema,
 } from './evaluations.schema';
 import { evaluationsService } from './evaluations.service';
 
@@ -12,8 +14,11 @@ const serialize = (ev: {
   id: string;
   cvId: string;
   jobDescriptionId: string;
+  candidateName: string | null;
+  jdTitle: string | null;
   status: string;
   overallScore: number | null;
+  classification: 'PASS' | 'WAITLIST' | 'FAIL' | null;
   recommendation: string | null;
   scoringEngine: string;
   processingTimeMs: number | null;
@@ -54,7 +59,7 @@ const evaluationsRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const evaluation = await evaluationsService.evaluate(request.body, request.user.sub);
+      const evaluation = await evaluationsService.evaluate(request.body, request.user.sub, request.user.role);
       return reply.status(201).send(serialize(evaluation));
     },
   );
@@ -81,8 +86,36 @@ const evaluationsRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const result = await evaluationsService.list(request.query);
+      const result = await evaluationsService.list({
+        ...request.query,
+        userId: request.user.sub,
+        role: request.user.role,
+      });
       return reply.send({ data: result.data.map(serialize), meta: result.meta });
+    },
+  );
+
+  // GET /stats — classification counts per JD
+  app.get(
+    '/stats',
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ['Evaluations'],
+        summary: 'Get pass/waitlist/fail counts per Job Description',
+        querystring: evaluationStatsQuerySchema,
+        response: {
+          200: z.object({ data: z.array(jdStatsSchema) }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const data = await evaluationsService.getStats({
+        jobDescriptionId: request.query.jobDescriptionId,
+        userId: request.user.sub,
+        role: request.user.role,
+      });
+      return reply.send({ data });
     },
   );
 
@@ -98,7 +131,7 @@ const evaluationsRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const evaluation = await evaluationsService.getById(request.params.id);
+      const evaluation = await evaluationsService.getById(request.params.id, request.user.sub, request.user.role);
       return reply.send(serialize(evaluation));
     },
   );

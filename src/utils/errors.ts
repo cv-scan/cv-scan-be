@@ -11,7 +11,7 @@ export class AppError extends Error {
 
 export class NotFoundError extends AppError {
   constructor(resource: string) {
-    super(`${resource} not found`, 404, 'NOT_FOUND');
+    super(`${resource} not found. Please check the ID and try again.`, 404, 'NOT_FOUND');
   }
 }
 
@@ -22,13 +22,13 @@ export class ValidationError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized') {
+  constructor(message = 'Authentication required. Please log in to continue.') {
     super(message, 401, 'UNAUTHORIZED');
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = 'Forbidden') {
+  constructor(message = 'You do not have permission to perform this action.') {
     super(message, 403, 'FORBIDDEN');
   }
 }

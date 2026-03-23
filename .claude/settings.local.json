@@ -13,7 +13,11 @@
       "Bash(docker rm:*)",
       "Bash(npm run:*)",
       "Bash(docker run:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Read(//Users/phamhuy/Downloads/**)",
+      "Bash(node -e \":*)"
     ]
   }
 }

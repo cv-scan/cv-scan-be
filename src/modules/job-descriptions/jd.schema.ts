@@ -40,6 +40,11 @@ export const jdListQuerySchema = z.object({
   isActive: z.coerce.boolean().optional(),
 });
 
+export const uploadJdQuerySchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+});
+export type UploadJdQueryDto = z.infer<typeof uploadJdQuerySchema>;
+
 export const jdResponseSchema = z.object({
   id: z.string(),
   title: z.string(),

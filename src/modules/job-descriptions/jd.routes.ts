@@ -1,11 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../../middleware/authenticate';
+import { AppError } from '../../utils/errors';
 import {
   createJdSchema,
   jdListQuerySchema,
   jdResponseSchema,
   updateJdSchema,
+  uploadJdQuerySchema,
 } from './jd.schema';
 import { jdService } from './jd.service';
 
@@ -37,6 +39,28 @@ const serialize = (jd: {
 });
 
 const jdRoutes: FastifyPluginAsyncZod = async (app) => {
+  // POST /upload — parse PDF/DOCX and auto-extract metadata
+  app.post(
+    '/upload',
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ['Job Descriptions'],
+        summary: 'Upload a JD file (PDF or DOCX) — auto-extracts title, location, skills, etc.',
+        querystring: uploadJdQuerySchema,
+        response: { 201: jdResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const data = await request.file();
+      if (!data) throw new AppError('No file attached. Please include a PDF or DOCX file in your request.', 400, 'NO_FILE');
+
+      const buffer = await data.toBuffer();
+      const jd = await jdService.uploadFromFile(buffer, data.mimetype, request.query, request.user.sub);
+      return reply.status(201).send(serialize(jd));
+    },
+  );
+
   // POST /
   app.post(
     '/',

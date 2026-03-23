@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+export const CLASSIFICATION_THRESHOLDS = {
+  PASS: 70,
+  FAIL: 40,
+} as const;
+
+export type Classification = 'PASS' | 'WAITLIST' | 'FAIL';
+
+export function classify(score: number | null): Classification | null {
+  if (score === null) return null;
+  if (score > CLASSIFICATION_THRESHOLDS.PASS) return 'PASS';
+  if (score >= CLASSIFICATION_THRESHOLDS.FAIL) return 'WAITLIST';
+  return 'FAIL';
+}
+
 export const createEvaluationSchema = z.object({
   cvId: z.string().min(1),
   jobDescriptionId: z.string().min(1),
@@ -11,9 +25,12 @@ export const evaluationListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   cvId: z.string().optional(),
   jobDescriptionId: z.string().optional(),
-  status: z
-    .enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED'])
-    .optional(),
+  status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED']).optional(),
+  classification: z.enum(['PASS', 'WAITLIST', 'FAIL']).optional(),
+});
+
+export const evaluationStatsQuerySchema = z.object({
+  jobDescriptionId: z.string().optional(),
 });
 
 const scoreSchema = z.object({
@@ -31,8 +48,11 @@ export const evaluationResponseSchema = z.object({
   id: z.string(),
   cvId: z.string(),
   jobDescriptionId: z.string(),
+  candidateName: z.string().nullable(),
+  jdTitle: z.string().nullable(),
   status: z.string(),
   overallScore: z.number().nullable(),
+  classification: z.enum(['PASS', 'WAITLIST', 'FAIL']).nullable(),
   recommendation: z.string().nullable(),
   scoringEngine: z.string(),
   processingTimeMs: z.number().nullable(),
@@ -42,4 +62,13 @@ export const evaluationResponseSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   scores: z.array(scoreSchema).optional(),
+});
+
+export const jdStatsSchema = z.object({
+  jobDescriptionId: z.string(),
+  jdTitle: z.string(),
+  total: z.number(),
+  pass: z.number(),
+  waitlist: z.number(),
+  fail: z.number(),
 });

@@ -68,12 +68,12 @@ export class AuthService {
     const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
 
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-      throw new UnauthorizedError('Invalid or expired refresh token');
+      throw new UnauthorizedError('Your session has expired. Please log in again.');
     }
 
     const user = await prisma.user.findUnique({ where: { id: stored.userId } });
     if (!user || !user.isActive) {
-      throw new UnauthorizedError('User not found or inactive');
+      throw new UnauthorizedError('Your account is inactive. Please contact support.');
     }
 
     // Rotate refresh token

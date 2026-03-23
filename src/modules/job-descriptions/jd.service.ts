@@ -1,7 +1,8 @@
 import { prisma } from '../../config/database.config';
-import { ForbiddenError, NotFoundError } from '../../utils/errors';
-import { extractSkillsFromJD } from './jd.extractor';
-import type { CreateJdDto, UpdateJdDto } from './jd.schema';
+import { isAllowedMimeType, parseFile } from '../../services/parser';
+import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { extractJdMetadata, extractSkillsFromJD } from './jd.extractor';
+import type { CreateJdDto, UpdateJdDto, UploadJdQueryDto } from './jd.schema';
 
 export class JdService {
   async create(dto: CreateJdDto, userId: string) {
@@ -26,6 +27,45 @@ export class JdService {
         weightEducation: weights?.education ?? 0.15,
         weightAchievements: weights?.achievements ?? 0.10,
         weightRelevance: weights?.relevance ?? 0.10,
+        createdBy: userId,
+      },
+    });
+  }
+
+  async uploadFromFile(buffer: Buffer, mimetype: string, query: UploadJdQueryDto, userId: string) {
+    if (!isAllowedMimeType(mimetype)) {
+      throw new AppError('Unsupported file type. Please upload a PDF or DOCX file.', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const content = await parseFile(buffer, mimetype);
+    const metadata = extractJdMetadata(content);
+    const title = query.title ?? metadata.title;
+
+    if (!title) {
+      throw new AppError(
+        'Could not extract a title from the file. Please provide a title via the ?title= query parameter.',
+        400,
+        'TITLE_REQUIRED',
+      );
+    }
+
+    return prisma.jobDescription.create({
+      data: {
+        title,
+        content,
+        department: metadata.department,
+        location: metadata.location,
+        employmentType: metadata.employmentType,
+        experienceLevel: metadata.experienceLevel,
+        requiredExperienceYears: metadata.requiredExperienceYears,
+        requiredEducation: metadata.requiredEducation,
+        requiredSkills: metadata.requiredSkills,
+        preferredSkills: metadata.preferredSkills,
+        weightSkills: 0.35,
+        weightExperience: 0.30,
+        weightEducation: 0.15,
+        weightAchievements: 0.10,
+        weightRelevance: 0.10,
         createdBy: userId,
       },
     });

@@ -131,6 +131,22 @@ export const SKILL_SYNONYMS: Record<string, string> = {
   // Agile
   'agile methodology': 'agile',
   'scrum methodology': 'scrum',
+
+  // Design / Content tools
+  'cap cut': 'capcut',
+  'adobe premiere': 'premiere pro',
+  'premiere pro': 'premiere pro',
+  'after effect': 'after effects',
+  'adobe photoshop': 'photoshop',
+  'adobe illustrator': 'illustrator',
+  'adobe after effects': 'after effects',
+  'google analytics': 'google analytics',
+  'google ads': 'google ads',
+  'meta ads': 'meta ads',
+  'facebook ads': 'meta ads',
+  'social media marketing': 'social media',
+  'content marketing': 'content marketing',
+  'email marketing': 'email marketing',
 };
 
 export function normalizeSkill(skill: string): string {
@@ -208,4 +224,14 @@ export const TECH_KEYWORDS = new Set([
   'elasticsearch', 'redis', 'memcached',
   'graphql', 'apollo', 'hasura',
   'jira', 'confluence', 'notion',
+
+  // Design & Creative tools
+  'figma', 'canva', 'capcut', 'photoshop', 'illustrator', 'after effects',
+  'premiere pro', 'lightroom', 'sketch', 'indesign', 'xd',
+
+  // Social Media & Marketing
+  'facebook', 'instagram', 'tiktok', 'youtube', 'zalo', 'linkedin',
+  'google ads', 'meta ads', 'google analytics', 'seo', 'sem',
+  'social media', 'content marketing', 'email marketing', 'copywriting',
+  'wordpress', 'hubspot',
 ]);
