@@ -24,7 +24,7 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
 
   JWT_SECRET: z.string().min(32),
-  JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
+  JWT_ACCESS_EXPIRES_IN: z.string().default("7d"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   BCRYPT_ROUNDS: z.coerce.number().default(12),
 
@@ -34,7 +34,7 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z
     .string()
-    .default("http://localhost:3001")
+    .default("http://localhost:3001,https://cv-scan-fe.vercel.app")
     .transform((val) => val.split(",").map((s) => s.trim())),
 
   RATE_LIMIT_MAX: z.coerce.number().default(100),

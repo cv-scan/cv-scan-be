@@ -17,7 +17,9 @@
       "Bash(lsof -ti:3000)",
       "Bash(xargs kill:*)",
       "Read(//Users/phamhuy/Downloads/**)",
-      "Bash(node -e \":*)"
+      "Bash(npm install:*)",
+    "Bash(railway up:*)",
+    "Bash(node -e \":*)"
     ]
   }
 }
