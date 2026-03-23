@@ -1,5 +1,7 @@
+import fs from 'node:fs';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { env } from '../../config/env';
 import { authenticate } from '../../middleware/authenticate';
 import { AppError } from '../../utils/errors';
 import {
@@ -24,14 +26,39 @@ type CvBase = {
   updatedAt: Date;
 };
 
-const serialize = (cv: CvBase) => ({
-  ...cv,
+function buildCvViewUrl(request: { protocol: string; headers: { host?: string } }, id: string) {
+  const host = request.headers.host;
+  const base = host ? `${request.protocol}://${host}` : '';
+  return `${base}${env.API_PREFIX}/cvs/${id}/view`;
+}
+
+const serialize = (cv: CvBase, viewUrl: string) => ({
+  id: cv.id,
+  candidateName: cv.candidateName,
+  candidateEmail: cv.candidateEmail,
+  viewUrl,
+  fileName: cv.fileName,
+  fileType: cv.fileType,
+  fileSize: cv.fileSize,
+  parseStatus: cv.parseStatus,
+  parseError: cv.parseError,
+  uploadedBy: cv.uploadedBy,
   createdAt: cv.createdAt.toISOString(),
   updatedAt: cv.updatedAt.toISOString(),
 });
 
-const serializeDetail = (cv: CvBase & { extractedText: string }) => ({
-  ...cv,
+const serializeDetail = (cv: CvBase & { extractedText: string }, viewUrl: string) => ({
+  id: cv.id,
+  candidateName: cv.candidateName,
+  candidateEmail: cv.candidateEmail,
+  viewUrl,
+  fileName: cv.fileName,
+  fileType: cv.fileType,
+  fileSize: cv.fileSize,
+  parseStatus: cv.parseStatus,
+  parseError: cv.parseError,
+  uploadedBy: cv.uploadedBy,
+  extractedText: cv.extractedText,
   createdAt: cv.createdAt.toISOString(),
   updatedAt: cv.updatedAt.toISOString(),
 });
@@ -63,7 +90,7 @@ const cvsRoutes: FastifyPluginAsyncZod = async (app) => {
             filesize: buffer.length,
             uploadedBy: request.user.sub,
           });
-          uploaded.push(serialize(cv));
+          uploaded.push(serialize(cv, buildCvViewUrl(request, cv.id)));
         } catch (err) {
           failed.push({
             filename: part.filename,
@@ -111,7 +138,10 @@ const cvsRoutes: FastifyPluginAsyncZod = async (app) => {
         userId: request.user.sub,
         role: request.user.role,
       });
-      return reply.send({ data: result.data.map(serialize), meta: result.meta });
+      return reply.send({
+        data: result.data.map((cv) => serialize(cv, buildCvViewUrl(request, cv.id))),
+        meta: result.meta,
+      });
     },
   );
 
@@ -128,7 +158,26 @@ const cvsRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request, reply) => {
       const cv = await cvsService.getById(request.params.id, request.user.sub, request.user.role);
-      return reply.send(serializeDetail(cv));
+      return reply.send(serializeDetail(cv, buildCvViewUrl(request, cv.id)));
+    },
+  );
+
+  // GET /:id/view — stream CV file inline for browser preview
+  app.get(
+    '/:id/view',
+    {
+      schema: {
+        tags: ['CVs'],
+        summary: 'View CV file in browser (public)',
+        params: z.object({ id: z.string() }),
+      },
+    },
+    async (request, reply) => {
+      const cv = await cvsService.getPublicViewById(request.params.id);
+
+      reply.header('Content-Disposition', `inline; filename="${cv.fileName}"`);
+      reply.type(cv.fileType);
+      return reply.send(fs.createReadStream(cv.storagePath));
     },
   );
 

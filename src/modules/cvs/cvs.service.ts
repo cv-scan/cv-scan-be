@@ -89,13 +89,25 @@ export class CvsService {
     const where = {
       ...(role !== 'ADMIN' ? { uploadedBy: userId } : {}),
       ...(parseStatus
-        ? { parseStatus: parseStatus as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' }
+        ? {
+            parseStatus: parseStatus as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED',
+          }
         : {}),
       ...(search
         ? {
             OR: [
-              { candidateName: { contains: search, mode: 'insensitive' as const } },
-              { candidateEmail: { contains: search, mode: 'insensitive' as const } },
+              {
+                candidateName: {
+                  contains: search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                candidateEmail: {
+                  contains: search,
+                  mode: 'insensitive' as const,
+                },
+              },
               { fileName: { contains: search, mode: 'insensitive' as const } },
             ],
           }
@@ -125,13 +137,30 @@ export class CvsService {
       prisma.cV.count({ where }),
     ]);
 
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async getById(id: string, userId: string, role: string) {
     const cv = await prisma.cV.findUnique({ where: { id } });
     if (!cv) throw new NotFoundError('CV');
     if (role !== 'ADMIN' && cv.uploadedBy !== userId) throw new ForbiddenError();
+    return cv;
+  }
+
+  async getPublicViewById(id: string) {
+    const cv = await prisma.cV.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        fileName: true,
+        fileType: true,
+        storagePath: true,
+      },
+    });
+    if (!cv) throw new NotFoundError('CV');
     return cv;
   }
 
