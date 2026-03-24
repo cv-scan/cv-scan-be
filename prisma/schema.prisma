@@ -50,16 +50,50 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// ─── Departments ─────────────────────────────────────────────
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  jobDescriptions JobDescription[]
+
+  @@map("departments")
+}
+
 // ─── Job Descriptions ────────────────────────────────────────
 
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+}
+
+enum ExperienceLevel {
+  INTERN
+  JUNIOR
+  MID_LEVEL
+  SENIOR
+  LEAD
+  MANAGER
+  DIRECTOR
+}
+
 model JobDescription {
-  id              String  @id @default(cuid())
+  id              String          @id @default(cuid())
   title           String
   content         String
-  department      String?
+  departmentId    String?         @map("department_id")
+  department      Department?     @relation(fields: [departmentId], references: [id])
   location        String?
-  employmentType  String? @map("employment_type")
-  experienceLevel String? @map("experience_level")
+  employmentTypes EmploymentType[] @map("employment_types")
+  experienceLevel ExperienceLevel? @map("experience_level")
 
   // Extracted by NLP on JD creation
   requiredSkills          String[] @map("required_skills")

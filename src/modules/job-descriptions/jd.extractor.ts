@@ -1,3 +1,4 @@
+import type { EmploymentType, ExperienceLevel } from '@prisma/client';
 import nlp from 'compromise';
 import { TECH_KEYWORDS, normalizeSkill } from '../../services/scoring/synonym.map';
 
@@ -41,9 +42,9 @@ export interface ExtractedJdSkills {
 export interface ExtractedJdMetadata extends ExtractedJdSkills {
   title: string;
   location?: string;
-  employmentType?: string;
+  employmentTypes: EmploymentType[];
   department?: string;
-  experienceLevel?: string;
+  experienceLevel?: ExperienceLevel;
   requiredExperienceYears?: number;
   requiredEducation?: string;
 }
@@ -77,20 +78,19 @@ function extractLocation(text: string): string | undefined {
   return m ? cleanValue(m[1]) || undefined : undefined;
 }
 
-function extractEmploymentType(text: string): string | undefined {
+function extractEmploymentType(text: string): EmploymentType[] {
   const m = text.match(
     /(?:thời\s*gian|employment\s*type|hình\s*thức(?:\s*làm\s*việc)?)\s*:\s*(.+)/i,
   );
-  if (!m) return undefined;
+  if (!m) return [];
   const raw = cleanValue(m[1]);
-  const hasFullTime = /full.?time|toàn\s*thời\s*gian/i.test(raw);
-  const hasPartTime = /part.?time|bán\s*thời\s*gian/i.test(raw);
-  if (hasFullTime && hasPartTime) return 'Full-time / Part-time';
-  if (hasFullTime) return 'Full-time';
-  if (hasPartTime) return 'Part-time';
-  if (/hybrid/i.test(raw)) return 'Hybrid';
-  if (/remote|từ\s*xa/i.test(raw)) return 'Remote';
-  return raw || undefined;
+  const types: EmploymentType[] = [];
+  if (/full.?time|toàn\s*thời\s*gian/i.test(raw)) types.push('FULL_TIME');
+  if (/part.?time|bán\s*thời\s*gian/i.test(raw)) types.push('PART_TIME');
+  if (/contract|hợp\s*đồng/i.test(raw)) types.push('CONTRACT');
+  if (/intern|thực\s*tập/i.test(raw)) types.push('INTERNSHIP');
+  if (/freelance/i.test(raw)) types.push('FREELANCE');
+  return types;
 }
 
 function extractDepartment(text: string): string | undefined {
@@ -102,13 +102,13 @@ function extractDepartment(text: string): string | undefined {
   return undefined;
 }
 
-function extractExperienceLevel(text: string): string | undefined {
-  if (/thực\s*tập\s*sinh|intern(?:ship)?/i.test(text)) return 'Intern';
-  if (/senior|cao\s*cấp|cấp\s*cao/i.test(text)) return 'Senior';
-  if (/junior|fresher|mới\s*ra\s*trường/i.test(text)) return 'Junior';
-  if (/mid.?level|trung\s*cấp/i.test(text)) return 'Mid-level';
-  if (/trưởng\s*nhóm|team\s*lead/i.test(text)) return 'Lead';
-  if (/quản\s*lý|manager/i.test(text)) return 'Manager';
+function extractExperienceLevel(text: string): ExperienceLevel | undefined {
+  if (/thực\s*tập\s*sinh|intern(?:ship)?/i.test(text)) return 'INTERN';
+  if (/senior|cao\s*cấp|cấp\s*cao/i.test(text)) return 'SENIOR';
+  if (/junior|fresher|mới\s*ra\s*trường/i.test(text)) return 'JUNIOR';
+  if (/mid.?level|trung\s*cấp/i.test(text)) return 'MID_LEVEL';
+  if (/trưởng\s*nhóm|team\s*lead/i.test(text)) return 'LEAD';
+  if (/quản\s*lý|manager/i.test(text)) return 'MANAGER';
   return undefined;
 }
 
@@ -128,13 +128,52 @@ function extractEducation(text: string): string | undefined {
   return undefined;
 }
 
+const ACHIEVEMENT_KEYWORDS =
+  /portfolio|side\s*project|open\s*source|publication|award|dự\s*án\s*cá\s*nhân|giải\s*thưởng|đóng\s*góp/i;
+
+/**
+ * Infer scoring weights from JD content signals.
+ * Returns weights that sum to exactly 1.0.
+ */
+export function inferScoringWeights(metadata: ExtractedJdMetadata): {
+  skills: number;
+  experience: number;
+  education: number;
+  achievements: number;
+  relevance: number;
+} {
+  // Raw signal scores — higher = more important in this JD
+  const skillCount = metadata.requiredSkills.length + metadata.preferredSkills.length * 0.5;
+  const rawSkills = 3.5 + Math.min(skillCount, 12) * 0.1;           // 3.5–4.7
+  const rawExperience = metadata.requiredExperienceYears !== undefined
+    ? 2.5 + Math.min(metadata.requiredExperienceYears, 10) * 0.1    // 2.5–3.5
+    : 2.0;
+  const rawEducation = metadata.requiredEducation !== undefined ? 1.8 : 0.8;
+  const rawAchievements = ACHIEVEMENT_KEYWORDS.test(
+    metadata.requiredSkills.concat(metadata.preferredSkills).join(' '),
+  ) ? 1.2 : 0.8;
+  const rawRelevance = 0.9; // always baseline
+
+  const total = rawSkills + rawExperience + rawEducation + rawAchievements + rawRelevance;
+
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const skills = r(rawSkills / total);
+  const experience = r(rawExperience / total);
+  const education = r(rawEducation / total);
+  const achievements = r(rawAchievements / total);
+  // Compute remainder to guarantee exact sum = 1.0
+  const relevance = r(1 - skills - experience - education - achievements);
+
+  return { skills, experience, education, achievements, relevance };
+}
+
 export function extractJdMetadata(rawText: string): ExtractedJdMetadata {
   // Normalize: split concatenated emoji-separated fields onto separate lines
   const normalized = splitOnEmoji(rawText);
 
   const title = extractTitle(normalized);
   const location = extractLocation(normalized);
-  const employmentType = extractEmploymentType(normalized);
+  const employmentTypes = extractEmploymentType(normalized);
   const department = extractDepartment(normalized);
   const experienceLevel = extractExperienceLevel(rawText);
   const requiredExperienceYears = extractExperienceYears(rawText);
@@ -144,7 +183,7 @@ export function extractJdMetadata(rawText: string): ExtractedJdMetadata {
   return {
     title,
     location,
-    employmentType,
+    employmentTypes,
     department,
     experienceLevel,
     requiredExperienceYears,

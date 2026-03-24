@@ -1,8 +1,11 @@
+import type { EmploymentType, ExperienceLevel } from '@prisma/client';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../../middleware/authenticate';
 import { AppError } from '../../utils/errors';
 import {
+  EmploymentTypeEnum,
+  ExperienceLevelEnum,
   createJdSchema,
   jdListQuerySchema,
   jdResponseSchema,
@@ -12,15 +15,16 @@ import {
 } from './jd.schema';
 import { jdService } from './jd.service';
 
-const serialize = (jd: {
+type JdRow = {
   id: string;
   title: string;
   content: string;
   fileUrl: string | null;
-  department: string | null;
+  departmentId: string | null;
+  department: { id: string; name: string } | null;
   location: string | null;
-  employmentType: string | null;
-  experienceLevel: string | null;
+  employmentTypes: EmploymentType[];
+  experienceLevel: ExperienceLevel | null;
   requiredSkills: string[];
   preferredSkills: string[];
   requiredExperienceYears: number | null;
@@ -35,7 +39,9 @@ const serialize = (jd: {
   createdAt: Date;
   updatedAt: Date;
   cvCount?: number;
-}) => ({
+};
+
+const serialize = (jd: JdRow) => ({
   ...jd,
   cvCount: jd.cvCount ?? 0,
   createdAt: jd.createdAt.toISOString(),
@@ -43,36 +49,105 @@ const serialize = (jd: {
 });
 
 const jdRoutes: FastifyPluginAsyncZod = async (app) => {
+  // GET /employment-types
+  app.get(
+    '/employment-types',
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ['Job Descriptions'],
+        summary: 'Get all employment type options',
+        response: { 200: z.object({ data: z.array(EmploymentTypeEnum) }) },
+      },
+    },
+    async (_request, reply) => {
+      return reply.send({ data: EmploymentTypeEnum.options });
+    },
+  );
+
+  // GET /experience-levels
+  app.get(
+    '/experience-levels',
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ['Job Descriptions'],
+        summary: 'Get all experience level options',
+        response: { 200: z.object({ data: z.array(ExperienceLevelEnum) }) },
+      },
+    },
+    async (_request, reply) => {
+      return reply.send({ data: ExperienceLevelEnum.options });
+    },
+  );
+
   // POST /upload — parse PDF/DOCX and auto-extract metadata
+  // Form fields: file (required), title?, departmentId?, experienceLevel?, employmentTypes? (comma-sep or repeated)
   app.post(
     '/upload',
     {
       preHandler: [authenticate],
       schema: {
         tags: ['Job Descriptions'],
-        summary: 'Upload a JD file (PDF or DOCX) — auto-extracts title, location, skills, etc.',
-        querystring: uploadJdQuerySchema,
+        summary: 'Upload a JD file (PDF or DOCX). Form fields: file, title?, departmentId?, experienceLevel?, employmentTypes? (comma-separated or repeated)',
         response: { 201: jdResponseSchema },
       },
     },
     async (request, reply) => {
-      const data = await request.file();
-      if (!data)
+      const formFields: Record<string, string | string[]> = {};
+      let fileBuffer: Buffer | null = null;
+      let fileMimetype = '';
+      let fileFilename = '';
+
+      for await (const part of request.parts()) {
+        if (part.type === 'file') {
+          fileBuffer = await part.toBuffer();
+          fileMimetype = part.mimetype;
+          fileFilename = part.filename;
+        } else {
+          const val = part.value as string;
+          const existing = formFields[part.fieldname];
+          formFields[part.fieldname] = existing
+            ? [...(Array.isArray(existing) ? existing : [existing]), val]
+            : val;
+        }
+      }
+
+      if (!fileBuffer) {
         throw new AppError(
           'No file attached. Please include a PDF or DOCX file in your request.',
           400,
           'NO_FILE',
         );
+      }
 
-      const buffer = await data.toBuffer();
+      const rawEt = formFields.employmentTypes;
+      const employmentTypesRaw = rawEt
+        ? Array.isArray(rawEt)
+          ? rawEt
+          : rawEt.split(',').map((s) => s.trim())
+        : undefined;
+
+      const query = uploadJdQuerySchema.parse({
+        title: formFields.title,
+        departmentId: formFields.departmentId,
+        employmentTypes: employmentTypesRaw,
+        experienceLevel: formFields.experienceLevel,
+        weightSkills: formFields.weightSkills,
+        weightExperience: formFields.weightExperience,
+        weightEducation: formFields.weightEducation,
+        weightAchievements: formFields.weightAchievements,
+        weightRelevance: formFields.weightRelevance,
+      });
+
       const jd = await jdService.uploadFromFile(
-        buffer,
-        data.mimetype,
-        data.filename,
-        request.query,
+        fileBuffer,
+        fileMimetype,
+        fileFilename,
+        query,
         request.user.sub,
       );
-      return reply.status(201).send(serialize(jd));
+      return reply.status(201).send(serialize(jd as JdRow));
     },
   );
 
@@ -89,24 +164,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request, reply) => {
       const jd = await jdService.create(request.body, request.user.sub);
-      return reply.status(201).send(serialize(jd));
-    },
-  );
-
-  // GET /departments — unique department list
-  app.get(
-    '/departments',
-    {
-      preHandler: [authenticate],
-      schema: {
-        tags: ['Job Descriptions'],
-        summary: 'Get all unique departments from Job Descriptions',
-        response: { 200: z.object({ data: z.array(z.string()) }) },
-      },
-    },
-    async (request, reply) => {
-      const data = await jdService.listDepartments(request.user.sub, request.user.role);
-      return reply.send({ data });
+      return reply.status(201).send(serialize(jd as JdRow));
     },
   );
 
@@ -138,7 +196,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
         role: request.user.role,
       });
       return reply.send({
-        data: result.data.map(serialize),
+        data: result.data.map((jd) => serialize(jd as JdRow)),
         meta: result.meta,
       });
     },
@@ -157,7 +215,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request, reply) => {
       const jd = await jdService.getById(request.params.id, request.user.sub, request.user.role);
-      return reply.send(serialize(jd));
+      return reply.send(serialize(jd as JdRow));
     },
   );
 
@@ -180,7 +238,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
         request.user.sub,
         request.user.role,
       );
-      return reply.send(serialize(jd));
+      return reply.send(serialize(jd as JdRow));
     },
   );
 
@@ -219,7 +277,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request, reply) => {
       const jd = await jdService.softDelete(request.params.id, request.user.sub, request.user.role);
-      return reply.send(serialize(jd));
+      return reply.send(serialize(jd as JdRow));
     },
   );
 };

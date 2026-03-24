@@ -10,6 +10,7 @@ import { errorHandler } from '../middleware/error-handler';
 import authRoutes from '../modules/auth/auth.routes';
 import batchesRoutes from '../modules/batches/batches.routes';
 import cvsRoutes from '../modules/cvs/cvs.routes';
+import departmentsRoutes from '../modules/departments/departments.routes';
 import evaluationsRoutes from '../modules/evaluations/evaluations.routes';
 import jdRoutes from '../modules/job-descriptions/jd.routes';
 import usersRoutes from '../modules/users/users.routes';
@@ -108,6 +109,7 @@ export async function buildApp() {
   const prefix = env.API_PREFIX;
 
   await app.register(authRoutes, { prefix: `${prefix}/auth` });
+  await app.register(departmentsRoutes, { prefix: `${prefix}/departments` });
   await app.register(jdRoutes, { prefix: `${prefix}/job-descriptions` });
   await app.register(cvsRoutes, { prefix: `${prefix}/cvs` });
   await app.register(evaluationsRoutes, { prefix: `${prefix}/evaluations` });

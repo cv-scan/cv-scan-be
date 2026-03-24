@@ -4,22 +4,26 @@ import { prisma } from '../../config/database.config';
 import { isAllowedMimeType, parseFile } from '../../services/parser';
 import { getStorage } from '../../services/storage';
 import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
-import { extractJdMetadata, extractSkillsFromJD } from './jd.extractor';
+import { extractJdMetadata, extractSkillsFromJD, inferScoringWeights } from './jd.extractor';
 import type { CreateJdDto, UpdateJdDto, UploadJdQueryDto } from './jd.schema';
+
+const includeJd = {
+  department: { select: { id: true, name: true } },
+  _count: { select: { evaluations: { where: { status: 'COMPLETED' as const } } } },
+} as const;
 
 export class JdService {
   async create(dto: CreateJdDto, userId: string) {
     const { requiredSkills, preferredSkills } = extractSkillsFromJD(dto.content);
-
     const weights = dto.scoringWeights;
 
     return prisma.jobDescription.create({
       data: {
         title: dto.title,
         content: dto.content,
-        department: dto.department,
+        departmentId: dto.departmentId,
         location: dto.location,
-        employmentType: dto.employmentType,
+        employmentTypes: dto.employmentTypes ?? [],
         experienceLevel: dto.experienceLevel,
         requiredExperienceYears: dto.requiredExperienceYears,
         requiredEducation: dto.requiredEducation,
@@ -32,6 +36,7 @@ export class JdService {
         weightRelevance: weights?.relevance ?? 0.1,
         createdBy: userId,
       },
+      include: includeJd,
     });
   }
 
@@ -67,26 +72,41 @@ export class JdService {
     const storage = getStorage();
     const fileUrl = await storage.save(uniqueName, buffer, mimetype);
 
+    const inferred = inferScoringWeights(metadata);
+
+    // Auto-lookup or create department from extracted name if no departmentId provided
+    let departmentId = query.departmentId;
+    if (!departmentId && metadata.department) {
+      const dept = await prisma.department.upsert({
+        where: { name: metadata.department },
+        create: { name: metadata.department },
+        update: {},
+        select: { id: true },
+      });
+      departmentId = dept.id;
+    }
+
     return prisma.jobDescription.create({
       data: {
         title,
         content,
         fileUrl,
-        department: metadata.department,
+        departmentId,
         location: metadata.location,
-        employmentType: metadata.employmentType,
-        experienceLevel: metadata.experienceLevel,
+        employmentTypes: query.employmentTypes ?? metadata.employmentTypes,
+        experienceLevel: query.experienceLevel ?? metadata.experienceLevel,
         requiredExperienceYears: metadata.requiredExperienceYears,
         requiredEducation: metadata.requiredEducation,
         requiredSkills: metadata.requiredSkills,
         preferredSkills: metadata.preferredSkills,
-        weightSkills: 0.35,
-        weightExperience: 0.3,
-        weightEducation: 0.15,
-        weightAchievements: 0.1,
-        weightRelevance: 0.1,
+        weightSkills: query.weightSkills ?? inferred.skills,
+        weightExperience: query.weightExperience ?? inferred.experience,
+        weightEducation: query.weightEducation ?? inferred.education,
+        weightAchievements: query.weightAchievements ?? inferred.achievements,
+        weightRelevance: query.weightRelevance ?? inferred.relevance,
         createdBy: userId,
       },
+      include: includeJd,
     });
   }
 
@@ -95,22 +115,22 @@ export class JdService {
     limit: number;
     search?: string;
     isActive?: boolean;
-    department?: string;
+    departmentId?: string;
     userId: string;
     role: string;
   }) {
-    const { page, limit, search, isActive, department, userId, role } = params;
+    const { page, limit, search, isActive, departmentId, userId, role } = params;
     const skip = (page - 1) * limit;
 
     const where = {
+      isActive: isActive ?? true,
       ...(role !== 'ADMIN' ? { createdBy: userId } : {}),
-      ...(isActive !== undefined ? { isActive } : {}),
-      ...(department ? { department: { equals: department, mode: 'insensitive' as const } } : {}),
+      ...(departmentId ? { departmentId } : {}),
       ...(search
         ? {
             OR: [
               { title: { contains: search, mode: 'insensitive' as const } },
-              { department: { contains: search, mode: 'insensitive' as const } },
+              { department: { name: { contains: search, mode: 'insensitive' as const } } },
             ],
           }
         : {}),
@@ -122,11 +142,7 @@ export class JdService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: { evaluations: { where: { status: 'COMPLETED' } } },
-          },
-        },
+        include: includeJd,
       }),
       prisma.jobDescription.count({ where }),
     ]);
@@ -138,11 +154,9 @@ export class JdService {
   }
 
   async getById(id: string, userId: string, role: string) {
-    const jd = await prisma.jobDescription.findUnique({
-      where: { id },
-      include: {
-        _count: { select: { evaluations: { where: { status: 'COMPLETED' } } } },
-      },
+    const jd = await prisma.jobDescription.findFirst({
+      where: { id, isActive: true },
+      include: includeJd,
     });
     if (!jd) throw new NotFoundError('Job Description');
     if (role !== 'ADMIN' && jd.createdBy !== userId) throw new ForbiddenError();
@@ -152,7 +166,6 @@ export class JdService {
   async update(id: string, dto: UpdateJdDto, userId: string, role: string) {
     const jd = await this.getById(id, userId, role);
 
-    // Re-extract skills if content changed
     let requiredSkills = jd.requiredSkills;
     let preferredSkills = jd.preferredSkills;
     if (dto.content) {
@@ -168,9 +181,9 @@ export class JdService {
       data: {
         ...(dto.title && { title: dto.title }),
         ...(dto.content && { content: dto.content }),
-        ...(dto.department !== undefined && { department: dto.department }),
+        ...(dto.departmentId !== undefined && { departmentId: dto.departmentId }),
         ...(dto.location !== undefined && { location: dto.location }),
-        ...(dto.employmentType !== undefined && { employmentType: dto.employmentType }),
+        ...(dto.employmentTypes !== undefined && { employmentTypes: dto.employmentTypes }),
         ...(dto.experienceLevel !== undefined && { experienceLevel: dto.experienceLevel }),
         ...(dto.requiredExperienceYears !== undefined && {
           requiredExperienceYears: dto.requiredExperienceYears,
@@ -186,9 +199,7 @@ export class JdService {
           weightRelevance: weights.relevance,
         }),
       },
-      include: {
-        _count: { select: { evaluations: { where: { status: 'COMPLETED' } } } },
-      },
+      include: includeJd,
     });
     return { ...updated, cvCount: updated._count.evaluations };
   }
@@ -208,24 +219,9 @@ export class JdService {
     const deleted = await prisma.jobDescription.update({
       where: { id },
       data: { isActive: false },
-      include: {
-        _count: { select: { evaluations: { where: { status: 'COMPLETED' } } } },
-      },
+      include: includeJd,
     });
     return { ...deleted, cvCount: deleted._count.evaluations };
-  }
-
-  async listDepartments(userId: string, role: string) {
-    const rows = await prisma.jobDescription.findMany({
-      where: {
-        department: { not: null },
-        ...(role !== 'ADMIN' ? { createdBy: userId } : {}),
-      },
-      select: { department: true },
-      distinct: ['department'],
-      orderBy: { department: 'asc' },
-    });
-    return rows.map((r) => r.department as string);
   }
 
   async getStats(id: string, userId: string, role: string) {
