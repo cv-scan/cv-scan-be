@@ -170,6 +170,15 @@ export class CvsService {
   async delete(id: string, userId: string, role: string) {
     const cv = await this.getById(id, userId, role);
 
+    const evaluationCount = await prisma.evaluation.count({ where: { cvId: id } });
+    if (evaluationCount > 0) {
+      throw new AppError(
+        'Cannot delete this CV because it has been used in evaluations.',
+        409,
+        'CV_IN_USE',
+      );
+    }
+
     // Delete from storage first (CLAUDE.md rule)
     const storage = getStorage();
     await storage.delete(cv.storagePath);

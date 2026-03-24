@@ -176,6 +176,16 @@ export class JdService {
 
   async softDelete(id: string, userId: string, role: string) {
     await this.getById(id, userId, role);
+
+    const evaluationCount = await prisma.evaluation.count({ where: { jobDescriptionId: id } });
+    if (evaluationCount > 0) {
+      throw new AppError(
+        'Cannot delete this Job Description because it has been used in evaluations.',
+        409,
+        'JD_IN_USE',
+      );
+    }
+
     return prisma.jobDescription.update({
       where: { id },
       data: { isActive: false },
