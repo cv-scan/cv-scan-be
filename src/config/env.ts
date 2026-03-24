@@ -24,9 +24,13 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
   BCRYPT_ROUNDS: z.coerce.number().default(12),
 
-  STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
+  STORAGE_PROVIDER: z.enum(['local', 's3', 'cloudinary']).default('local'),
   MAX_FILE_SIZE_MB: z.coerce.number().default(10),
   LOCAL_UPLOAD_DIR: z.string().default('./uploads'),
+
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 
   CORS_ORIGIN: z
     .string()

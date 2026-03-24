@@ -49,6 +49,7 @@ export const jdResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
   content: z.string(),
+  fileUrl: z.string().nullable(),
   department: z.string().nullable(),
   location: z.string().nullable(),
   employmentType: z.string().nullable(),

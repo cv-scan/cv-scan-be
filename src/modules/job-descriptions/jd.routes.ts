@@ -15,6 +15,7 @@ const serialize = (jd: {
   id: string;
   title: string;
   content: string;
+  fileUrl: string | null;
   department: string | null;
   location: string | null;
   employmentType: string | null;
@@ -64,6 +65,7 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
       const jd = await jdService.uploadFromFile(
         buffer,
         data.mimetype,
+        data.filename,
         request.query,
         request.user.sub,
       );

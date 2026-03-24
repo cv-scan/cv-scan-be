@@ -74,6 +74,8 @@ model JobDescription {
   weightAchievements Float @default(0.10) @map("weight_achievements")
   weightRelevance    Float @default(0.10) @map("weight_relevance")
 
+  fileUrl   String?  @map("file_url")
+
   isActive  Boolean  @default(true) @map("is_active")
   createdBy String   @map("created_by")
   creator   User     @relation(fields: [createdBy], references: [id])

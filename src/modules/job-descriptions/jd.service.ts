@@ -1,5 +1,8 @@
+import crypto from 'node:crypto';
+import path from 'node:path';
 import { prisma } from '../../config/database.config';
 import { isAllowedMimeType, parseFile } from '../../services/parser';
+import { getStorage } from '../../services/storage';
 import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { extractJdMetadata, extractSkillsFromJD } from './jd.extractor';
 import type { CreateJdDto, UpdateJdDto, UploadJdQueryDto } from './jd.schema';
@@ -32,7 +35,13 @@ export class JdService {
     });
   }
 
-  async uploadFromFile(buffer: Buffer, mimetype: string, query: UploadJdQueryDto, userId: string) {
+  async uploadFromFile(
+    buffer: Buffer,
+    mimetype: string,
+    filename: string,
+    query: UploadJdQueryDto,
+    userId: string,
+  ) {
     if (!isAllowedMimeType(mimetype)) {
       throw new AppError(
         'Unsupported file type. Please upload a PDF or DOCX file.',
@@ -53,10 +62,16 @@ export class JdService {
       );
     }
 
+    const ext = path.extname(filename);
+    const uniqueName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+    const storage = getStorage();
+    const fileUrl = await storage.save(uniqueName, buffer, mimetype);
+
     return prisma.jobDescription.create({
       data: {
         title,
         content,
+        fileUrl,
         department: metadata.department,
         location: metadata.location,
         employmentType: metadata.employmentType,

@@ -11,7 +11,7 @@ export const cvResponseSchema = z.object({
   id: z.string(),
   candidateName: z.string(),
   candidateEmail: z.string().nullable(),
-  viewUrl: z.string(),
+  fileUrl: z.string(),
   fileName: z.string(),
   fileType: z.string(),
   fileSize: z.number(),

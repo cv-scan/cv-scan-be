@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { prisma } from '../../config/database.config';
+import { env } from '../../config/env';
 import { isAllowedMimeType, parseFile } from '../../services/parser';
 import { getStorage } from '../../services/storage';
 import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
@@ -65,7 +66,7 @@ export class CvsService {
         fileType: mimetype,
         fileSize: filesize,
         storagePath,
-        storageProvider: 'local',
+        storageProvider: env.STORAGE_PROVIDER,
         extractedText,
         extractedAt: parseStatus === 'COMPLETED' ? new Date() : null,
         parseStatus,
@@ -127,6 +128,7 @@ export class CvsService {
           fileName: true,
           fileType: true,
           fileSize: true,
+          storagePath: true,
           parseStatus: true,
           parseError: true,
           uploadedBy: true,
@@ -158,6 +160,7 @@ export class CvsService {
         fileName: true,
         fileType: true,
         storagePath: true,
+        storageProvider: true,
       },
     });
     if (!cv) throw new NotFoundError('CV');
