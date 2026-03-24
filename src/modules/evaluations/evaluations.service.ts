@@ -147,18 +147,20 @@ export class EvaluationsService {
     limit: number;
     cvId?: string;
     jobDescriptionId?: string;
+    departmentId?: string;
     status?: string;
     classification?: Classification;
     userId: string;
     role: string;
   }) {
-    const { page, limit, cvId, jobDescriptionId, status, classification, userId, role } = params;
+    const { page, limit, cvId, jobDescriptionId, departmentId, status, classification, userId, role } = params;
     const skip = (page - 1) * limit;
 
     const where = {
       ...(role !== 'ADMIN' ? { cv: { uploadedBy: userId } } : {}),
       ...(cvId ? { cvId } : {}),
       ...(jobDescriptionId ? { jobDescriptionId } : {}),
+      ...(departmentId ? { jobDescription: { departmentId } } : {}),
       ...(status ? { status: status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' } : {}),
       ...(classification ? { classification } : {}),
     };

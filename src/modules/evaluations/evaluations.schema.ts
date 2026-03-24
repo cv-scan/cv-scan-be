@@ -25,6 +25,7 @@ export const evaluationListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   cvId: z.string().optional(),
   jobDescriptionId: z.string().optional(),
+  departmentId: z.string().optional(),
   status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED']).optional(),
   classification: z.enum(['PASS', 'WAITLIST', 'FAIL']).optional(),
 });
