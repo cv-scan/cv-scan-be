@@ -93,6 +93,23 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // GET /departments — unique department list
+  app.get(
+    '/departments',
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ['Job Descriptions'],
+        summary: 'Get all unique departments from Job Descriptions',
+        response: { 200: z.object({ data: z.array(z.string()) }) },
+      },
+    },
+    async (request, reply) => {
+      const data = await jdService.listDepartments(request.user.sub, request.user.role);
+      return reply.send({ data });
+    },
+  );
+
   // GET /
   app.get(
     '/',

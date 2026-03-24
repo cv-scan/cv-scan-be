@@ -38,6 +38,7 @@ export const jdListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().optional(),
   isActive: z.coerce.boolean().optional(),
+  department: z.string().optional(),
 });
 
 export const jdStatsResponseSchema = z.object({

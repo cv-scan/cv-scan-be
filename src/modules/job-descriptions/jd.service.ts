@@ -95,15 +95,17 @@ export class JdService {
     limit: number;
     search?: string;
     isActive?: boolean;
+    department?: string;
     userId: string;
     role: string;
   }) {
-    const { page, limit, search, isActive, userId, role } = params;
+    const { page, limit, search, isActive, department, userId, role } = params;
     const skip = (page - 1) * limit;
 
     const where = {
       ...(role !== 'ADMIN' ? { createdBy: userId } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
+      ...(department ? { department: { equals: department, mode: 'insensitive' as const } } : {}),
       ...(search
         ? {
             OR: [
@@ -211,6 +213,19 @@ export class JdService {
       },
     });
     return { ...deleted, cvCount: deleted._count.evaluations };
+  }
+
+  async listDepartments(userId: string, role: string) {
+    const rows = await prisma.jobDescription.findMany({
+      where: {
+        department: { not: null },
+        ...(role !== 'ADMIN' ? { createdBy: userId } : {}),
+      },
+      select: { department: true },
+      distinct: ['department'],
+      orderBy: { department: 'asc' },
+    });
+    return rows.map((r) => r.department as string);
   }
 
   async getStats(id: string, userId: string, role: string) {
