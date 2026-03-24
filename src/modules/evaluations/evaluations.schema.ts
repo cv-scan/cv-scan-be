@@ -1,17 +1,17 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const CLASSIFICATION_THRESHOLDS = {
-  PASS: 70,
-  FAIL: 40,
+  PASS: 0.7,
+  FAIL: 0.4,
 } as const;
 
-export type Classification = 'PASS' | 'WAITLIST' | 'FAIL';
+export type Classification = "PASS" | "WAITLIST" | "FAIL";
 
 export function classify(score: number | null): Classification | null {
   if (score === null) return null;
-  if (score > CLASSIFICATION_THRESHOLDS.PASS) return 'PASS';
-  if (score >= CLASSIFICATION_THRESHOLDS.FAIL) return 'WAITLIST';
-  return 'FAIL';
+  if (score >= CLASSIFICATION_THRESHOLDS.PASS) return "PASS";
+  if (score >= CLASSIFICATION_THRESHOLDS.FAIL) return "WAITLIST";
+  return "FAIL";
 }
 
 export const createEvaluationSchema = z.object({
@@ -26,8 +26,10 @@ export const evaluationListQuerySchema = z.object({
   cvId: z.string().optional(),
   jobDescriptionId: z.string().optional(),
   departmentId: z.string().optional(),
-  status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED']).optional(),
-  classification: z.enum(['PASS', 'WAITLIST', 'FAIL']).optional(),
+  status: z
+    .enum(["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"])
+    .optional(),
+  classification: z.enum(["PASS", "WAITLIST", "FAIL"]).optional(),
 });
 
 export const evaluationStatsQuerySchema = z.object({
@@ -53,7 +55,7 @@ export const evaluationResponseSchema = z.object({
   jdTitle: z.string().nullable(),
   status: z.string(),
   overallScore: z.number().nullable(),
-  classification: z.enum(['PASS', 'WAITLIST', 'FAIL']).nullable(),
+  classification: z.enum(["PASS", "WAITLIST", "FAIL"]).nullable(),
   recommendation: z.string().nullable(),
   scoringEngine: z.string(),
   processingTimeMs: z.number().nullable(),
