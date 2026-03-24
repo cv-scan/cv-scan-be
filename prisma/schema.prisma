@@ -133,9 +133,10 @@ model Evaluation {
   cv               CV               @relation(fields: [cvId], references: [id], onDelete: Cascade)
   jobDescriptionId String           @map("job_description_id")
   jobDescription   JobDescription   @relation(fields: [jobDescriptionId], references: [id])
-  status           EvaluationStatus @default(PENDING)
-  overallScore     Float?           @map("overall_score")
-  recommendation   String?          // STRONG_YES | YES | MAYBE | NO | STRONG_NO
+  status           EvaluationStatus        @default(PENDING)
+  overallScore     Float?                  @map("overall_score")
+  classification   CandidateClassification? @map("classification")
+  recommendation   String?                 // STRONG_YES | YES | MAYBE | NO | STRONG_NO
 
   // NLP engine metadata
   scoringEngine    String  @default("rule-based-nlp") @map("scoring_engine")
@@ -168,6 +169,12 @@ enum EvaluationStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum CandidateClassification {
+  PASS
+  WAITLIST
+  FAIL
 }
 
 // ─── Scores ──────────────────────────────────────────────────

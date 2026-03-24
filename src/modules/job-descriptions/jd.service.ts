@@ -120,18 +120,31 @@ export class JdService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { evaluations: { where: { status: 'COMPLETED' } } },
+          },
+        },
       }),
       prisma.jobDescription.count({ where }),
     ]);
 
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: data.map((jd) => ({ ...jd, cvCount: jd._count.evaluations })),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async getById(id: string, userId: string, role: string) {
-    const jd = await prisma.jobDescription.findUnique({ where: { id } });
+    const jd = await prisma.jobDescription.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { evaluations: { where: { status: 'COMPLETED' } } } },
+      },
+    });
     if (!jd) throw new NotFoundError('Job Description');
     if (role !== 'ADMIN' && jd.createdBy !== userId) throw new ForbiddenError();
-    return jd;
+    return { ...jd, cvCount: jd._count.evaluations };
   }
 
   async update(id: string, dto: UpdateJdDto, userId: string, role: string) {
@@ -148,7 +161,7 @@ export class JdService {
 
     const weights = dto.scoringWeights;
 
-    return prisma.jobDescription.update({
+    const updated = await prisma.jobDescription.update({
       where: { id },
       data: {
         ...(dto.title && { title: dto.title }),
@@ -171,7 +184,11 @@ export class JdService {
           weightRelevance: weights.relevance,
         }),
       },
+      include: {
+        _count: { select: { evaluations: { where: { status: 'COMPLETED' } } } },
+      },
     });
+    return { ...updated, cvCount: updated._count.evaluations };
   }
 
   async softDelete(id: string, userId: string, role: string) {
@@ -186,10 +203,27 @@ export class JdService {
       );
     }
 
-    return prisma.jobDescription.update({
+    const deleted = await prisma.jobDescription.update({
       where: { id },
       data: { isActive: false },
+      include: {
+        _count: { select: { evaluations: { where: { status: 'COMPLETED' } } } },
+      },
     });
+    return { ...deleted, cvCount: deleted._count.evaluations };
+  }
+
+  async getStats(id: string, userId: string, role: string) {
+    await this.getById(id, userId, role);
+
+    const [total, pass, waitlist, fail] = await Promise.all([
+      prisma.evaluation.count({ where: { jobDescriptionId: id, status: 'COMPLETED' } }),
+      prisma.evaluation.count({ where: { jobDescriptionId: id, status: 'COMPLETED', classification: 'PASS' } }),
+      prisma.evaluation.count({ where: { jobDescriptionId: id, status: 'COMPLETED', classification: 'WAITLIST' } }),
+      prisma.evaluation.count({ where: { jobDescriptionId: id, status: 'COMPLETED', classification: 'FAIL' } }),
+    ]);
+
+    return { jobDescriptionId: id, total, pass, waitlist, fail };
   }
 }
 

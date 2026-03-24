@@ -108,6 +108,7 @@ export class EvaluationsService {
           data: {
             status: 'COMPLETED',
             overallScore: result.overallScore,
+            classification: classify(result.overallScore),
             recommendation: result.recommendation,
             processingTimeMs: result.processingTimeMs,
             completedAt: new Date(),
@@ -154,26 +155,12 @@ export class EvaluationsService {
     const { page, limit, cvId, jobDescriptionId, status, classification, userId, role } = params;
     const skip = (page - 1) * limit;
 
-    // Map classification filter to score ranges
-    const scoreFilter =
-      classification === 'PASS'
-        ? { overallScore: { gt: 70 } }
-        : classification === 'WAITLIST'
-          ? { overallScore: { gte: 40, lte: 70 } }
-          : classification === 'FAIL'
-            ? { overallScore: { lt: 40 } }
-            : {};
-
     const where = {
       ...(role !== 'ADMIN' ? { cv: { uploadedBy: userId } } : {}),
       ...(cvId ? { cvId } : {}),
       ...(jobDescriptionId ? { jobDescriptionId } : {}),
-      ...(status
-        ? {
-            status: status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED',
-          }
-        : {}),
-      ...scoreFilter,
+      ...(status ? { status: status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' } : {}),
+      ...(classification ? { classification } : {}),
     };
 
     const [data, total] = await Promise.all([

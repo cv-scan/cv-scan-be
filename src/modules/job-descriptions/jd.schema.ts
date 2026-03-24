@@ -40,6 +40,14 @@ export const jdListQuerySchema = z.object({
   isActive: z.coerce.boolean().optional(),
 });
 
+export const jdStatsResponseSchema = z.object({
+  jobDescriptionId: z.string(),
+  total: z.number(),
+  pass: z.number(),
+  waitlist: z.number(),
+  fail: z.number(),
+});
+
 export const uploadJdQuerySchema = z.object({
   title: z.string().min(1).max(200).optional(),
 });
@@ -67,4 +75,5 @@ export const jdResponseSchema = z.object({
   createdBy: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  cvCount: z.number(),
 });

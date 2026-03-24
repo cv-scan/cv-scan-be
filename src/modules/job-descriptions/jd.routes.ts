@@ -6,6 +6,7 @@ import {
   createJdSchema,
   jdListQuerySchema,
   jdResponseSchema,
+  jdStatsResponseSchema,
   updateJdSchema,
   uploadJdQuerySchema,
 } from './jd.schema';
@@ -33,8 +34,10 @@ const serialize = (jd: {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+  cvCount?: number;
 }) => ({
   ...jd,
+  cvCount: jd.cvCount ?? 0,
   createdAt: jd.createdAt.toISOString(),
   updatedAt: jd.updatedAt.toISOString(),
 });
@@ -161,6 +164,28 @@ const jdRoutes: FastifyPluginAsyncZod = async (app) => {
         request.user.role,
       );
       return reply.send(serialize(jd));
+    },
+  );
+
+  // GET /:id/stats
+  app.get(
+    '/:id/stats',
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ['Job Descriptions'],
+        summary: 'Get CV scan statistics for a Job Description',
+        params: z.object({ id: z.string() }),
+        response: { 200: jdStatsResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const stats = await jdService.getStats(
+        request.params.id,
+        request.user.sub,
+        request.user.role,
+      );
+      return reply.send(stats);
     },
   );
 
